@@ -23,14 +23,19 @@
 - [x] 2.9 NavBar — thin Discord-style icon bar with animated active pill indicator
 - [x] 2.10 globals.css rewritten — full Discord dark theme + all shadcn CSS variable mappings
 
-## Phase 3: Real-Time Chat
-- [ ] 3.1 Chat channel page (`(app)/channels/[channelId]/page.tsx`)
-- [ ] 3.2 Message list component — infinite scroll upward, bottom-anchored
-- [ ] 3.3 Supabase Realtime subscription for new messages
-- [ ] 3.4 Message input bar (bottom) with send action (Server Action)
-- [ ] 3.5 File attachment support inside chat (image/video via presigned URL)
-- [ ] 3.6 Message delete (own messages only)
-- [ ] 3.7 Optimistic UI updates on send
+## Phase 3: Real-Time Chat ✅ (text messages only — attachments in Phase 4)
+- [x] 3.1 Chat channel page — Server Component, fetches channel + initial 50 messages
+- [x] 3.2 MessageList — channel intro header, grouped messages (same user within 5 min), auto-scroll
+- [x] 3.3 Supabase Realtime postgres_changes subscription (INSERT, filtered by channel_id)
+- [x] 3.4 MessageInput — auto-resizing textarea, Enter to send, Shift+Enter for newline
+- [x] 3.5 sendMessage Server Action — zod validation, auth check, Supabase insert
+- [x] 3.6 Memory management — subscription.unsubscribe() in useEffect cleanup; key={channelId} forces full remount on channel switch (zero WebSocket leaks)
+- [x] 3.7 Profile cache in ChatArea — avoids redundant Supabase lookups for known senders
+- [x] 3.8 Added messages + media_attachments to supabase_realtime publication (migration: enable_realtime_messages)
+- [x] 3.9 Loading skeleton for channel page (loading.tsx)
+- [ ] 3.10 File attachment support inside chat (deferred to Phase 4)
+- [ ] 3.11 Message delete (own messages only)
+- [ ] 3.12 Optimistic UI updates on send
 
 ## Phase 4: Media Gallery (Bunkr Vibe)
 - [ ] 4.1 Media forum page — full gallery grid layout

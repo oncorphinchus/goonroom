@@ -23,6 +23,31 @@ export function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+export function formatMessageTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const timeStr = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (msgStart.getTime() === todayStart.getTime()) {
+    return `Today at ${timeStr}`;
+  }
+
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  if (msgStart.getTime() === yesterdayStart.getTime()) {
+    return `Yesterday at ${timeStr}`;
+  }
+
+  return `${date.toLocaleDateString("en-US")} ${timeStr}`;
+}
+
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

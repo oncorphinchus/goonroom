@@ -31,41 +31,26 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark-first Discord-style color system — no light mode */
+/* Dark-first Discord-style color system */
 :root {
   --radius: 0.375rem;
 
-  /* Surface layers */
   --background:            #313338;
   --foreground:            #dcddde;
-
   --card:                  #2b2d31;
   --card-foreground:       #dcddde;
-
   --popover:               #18191c;
   --popover-foreground:    #dcddde;
-
-  /* Brand */
   --primary:               #5865f2;
   --primary-foreground:    #ffffff;
-
-  /* Subtle interactive surface */
   --secondary:             #3a3c42;
   --secondary-foreground:  #dcddde;
-
-  /* Low-contrast fill */
   --muted:                 #2b2d31;
   --muted-foreground:      #8e9297;
-
-  /* Hover / active state surface */
   --accent:                #35373c;
   --accent-foreground:     #dcddde;
-
-  /* Danger */
   --destructive:           #ed4245;
   --destructive-foreground: #ffffff;
-
-  /* Structure */
   --border:                #3f4147;
   --input:                 #1e1f22;
   --ring:                  #5865f2;
@@ -84,9 +69,12 @@ body {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #3f4147 transparent;
 }
 
-/* Thin custom scrollbar */
+/* WebKit scrollbar (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;

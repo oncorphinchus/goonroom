@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/layout/NavBar";
 import { ChannelSidebar } from "@/components/layout/ChannelSidebar";
@@ -14,12 +13,19 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
-
-  const [{ data: profile }, { data: channels }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
+  const [profileResult, channelsResult] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("channels").select("*").order("position"),
   ]);
+
+  const { data: profile, error: profileError } = profileResult;
+  const { data: channels } = channelsResult;
+
+  if (profileError || !profile) {
+    throw new Error(
+      `Failed to load user profile: ${profileError?.message ?? "Profile not found"}`
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#313338]">
