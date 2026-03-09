@@ -11,15 +11,17 @@
 - [x] 1.8 MinIO S3 client (`src/lib/s3.ts`)
 - [x] 1.9 `.env.local` scaffold with placeholders
 
-## Phase 2: Auth + App Shell
-- [ ] 2.1 Supabase Auth — email/password login + register pages
-- [ ] 2.2 Auth callback route (`/auth/callback`)
-- [ ] 2.3 Middleware for session refresh (`src/middleware.ts`)
-- [ ] 2.4 Root layout with Inter + Google Fonts
-- [ ] 2.5 Authenticated app shell layout (`(app)/layout.tsx`)
-- [ ] 2.6 Sidebar component — splits "Chat Channels" and "Media Forums"
-- [ ] 2.7 Active channel highlighting, client-side navigation (no full reloads)
-- [ ] 2.8 User avatar + username display in sidebar footer
+## Phase 2: Auth + App Shell ✅
+- [x] 2.1 Supabase Auth — email/password login + register pages (react-hook-form + zod)
+- [x] 2.2 Auth callback route (`/auth/callback`)
+- [x] 2.3 Middleware for session refresh (`src/middleware.ts`) + route guards
+- [x] 2.4 Root layout with Inter + Playfair Display from Google Fonts
+- [x] 2.5 Authenticated app shell layout (`(app)/layout.tsx`) — server component
+- [x] 2.6 ChannelSidebar — splits "Text Channels" and "Media Forums", server-fetched channels
+- [x] 2.7 Active channel highlighting via usePathname, client-side navigation
+- [x] 2.8 User avatar + username in sidebar footer with Mute/Deafen/SignOut icons
+- [x] 2.9 NavBar — thin Discord-style icon bar with animated active pill indicator
+- [x] 2.10 globals.css rewritten — full Discord dark theme + all shadcn CSS variable mappings
 
 ## Phase 3: Real-Time Chat
 - [ ] 3.1 Chat channel page (`(app)/channels/[channelId]/page.tsx`)

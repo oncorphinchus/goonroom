@@ -1,3 +1,4 @@
+import "server-only";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -24,9 +25,9 @@ export async function getPresignedUploadUrl(
   mimeType: string,
   prefix: "media" | "thumbnails" = "media"
 ): Promise<PresignedUploadResult> {
-  const timestamp = Date.now();
+  const uuid = crypto.randomUUID();
   const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const fileKey = `${prefix}/${timestamp}_${sanitized}`;
+  const fileKey = `${prefix}/${uuid}_${sanitized}`;
 
   const command = new PutObjectCommand({
     Bucket: BUCKET,
@@ -35,7 +36,6 @@ export async function getPresignedUploadUrl(
   });
 
   const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
-
   const fileUrl = `${process.env.MINIO_PUBLIC_URL}/${BUCKET}/${fileKey}`;
 
   return { uploadUrl, fileKey, fileUrl };
