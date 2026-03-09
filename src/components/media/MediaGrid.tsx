@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MediaCard } from "./MediaCard";
@@ -25,20 +25,29 @@ export function MediaGrid({
   gridSize,
   onItemClick,
 }: MediaGridProps) {
+  // Derive a stable identity from the initial dataset so we can detect when
+  // the parent re-fetched (e.g. sort changed). Using the first item's id + total
+  // avoids deep comparison while still catching every meaningful reset.
+  const dataKey = useMemo(
+    () => `${initialItems[0]?.id ?? "empty"}-${initialTotal}`,
+    [initialItems, initialTotal]
+  );
+
   const [items, setItems] = useState<MediaItem[]>(initialItems);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [activeKey, setActiveKey] = useState(dataKey);
 
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const hasMore = (page + 1) * PAGE_SIZE < total;
-
-  // Reset when sort changes (parent re-fetches initial page).
-  useEffect(() => {
+  if (dataKey !== activeKey) {
+    setActiveKey(dataKey);
     setItems(initialItems);
     setTotal(initialTotal);
     setPage(0);
-  }, [initialItems, initialTotal]);
+  }
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasMore = (page + 1) * PAGE_SIZE < total;
 
   // Infinite scroll via IntersectionObserver.
   const loadMore = useCallback(async () => {

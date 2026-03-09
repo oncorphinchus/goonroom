@@ -50,3 +50,49 @@ export async function sendMessage(input: {
     return { error: insertError.message };
   }
 }
+
+const deleteMessageSchema = z.object({
+  messageId: z.string().uuid("Invalid message ID"),
+});
+
+export async function deleteMessage(input: {
+  messageId: string;
+}): Promise<{ error: string } | undefined> {
+  const parsed = deleteMessageSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: "Not authenticated. Please sign in again." };
+  }
+
+  const { data: message, error: fetchErr } = await supabase
+    .from("messages")
+    .select("id, user_id")
+    .eq("id", parsed.data.messageId)
+    .single();
+
+  if (fetchErr || !message) {
+    return { error: "Message not found." };
+  }
+
+  if (message.user_id !== user.id) {
+    return { error: "You can only delete your own messages." };
+  }
+
+  const { error: deleteErr } = await supabase
+    .from("messages")
+    .delete()
+    .eq("id", parsed.data.messageId);
+
+  if (deleteErr) {
+    return { error: deleteErr.message };
+  }
+}

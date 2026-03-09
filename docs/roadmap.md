@@ -35,7 +35,7 @@
 - [x] 3.9 Loading skeleton for channel page (loading.tsx)
 - [x] 3.10 Optimistic UI — pending messages render in grey/italic, reconciled on Realtime INSERT
 - [ ] 3.11 File attachment support inside chat (deferred to Phase 4)
-- [ ] 3.12 Message delete (own messages only)
+- [x] 3.12 Message delete (own messages only) — optimistic remove, Realtime DELETE listener, hover trash icon
 
 ## Phase 4: Media Gallery (Bunkr Vibe)
 - [x] 4.1 Media forum page — full gallery grid layout with IntersectionObserver infinite scroll

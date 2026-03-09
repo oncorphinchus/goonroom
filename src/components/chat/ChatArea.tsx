@@ -5,6 +5,7 @@ import { Hash, Images } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { deleteMessage } from "@/features/chat/actions";
 import type { Tables } from "@/types/database";
 import type { MessageWithProfile } from "@/types/chat";
 
@@ -103,6 +104,29 @@ export function ChatArea({
     });
   }, []);
 
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      const removed = messages.find((m) => m.id === messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+      const result = await deleteMessage({ messageId });
+
+      if (result?.error && removed) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === messageId)) return prev;
+          const next = [...prev, removed];
+          next.sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()
+          );
+          return next;
+        });
+      }
+    },
+    [messages]
+  );
+
   // Realtime subscription — reconciles optimistic messages with confirmed rows.
   useEffect(() => {
     const subscription = supabase
@@ -141,6 +165,21 @@ export function ChatArea({
           });
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+          filter: `channel_id=eq.${channel.id}`,
+        },
+        (payload) => {
+          const old = payload.old as { id?: string };
+          if (old.id) {
+            setMessages((prev) => prev.filter((m) => m.id !== old.id));
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -169,6 +208,7 @@ export function ChatArea({
         messages={messages}
         currentUserId={currentUserId}
         channelName={channel.name}
+        onDeleteMessage={handleDeleteMessage}
       />
 
       <MessageInput

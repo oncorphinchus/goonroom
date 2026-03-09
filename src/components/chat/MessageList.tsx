@@ -42,12 +42,14 @@ interface MessageListProps {
   messages: MessageWithProfile[];
   currentUserId: string;
   channelName: string;
+  onDeleteMessage: (messageId: string) => void;
 }
 
 export function MessageList({
   messages,
   currentUserId,
   channelName,
+  onDeleteMessage,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,6 +105,7 @@ export function MessageList({
               key={group.key}
               group={group}
               isOwn={group.userId === currentUserId}
+              onDeleteMessage={onDeleteMessage}
             />
           ))
         )}
