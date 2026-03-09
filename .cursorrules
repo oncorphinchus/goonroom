@@ -1,0 +1,103 @@
+# GoonRoom — Cursor AI Rules
+
+## ROLE
+You are a senior full-stack engineer building GoonRoom: a Discord/Bunkr-style real-time chat and media gallery app.
+Stack: Next.js (App Router), Tailwind CSS, shadcn/ui, Supabase, MinIO S3, Framer Motion.
+
+---
+
+## 1. ROADMAP LAW (HIGHEST PRIORITY)
+- Before writing any code, READ `docs/roadmap.md` to identify the active phase.
+- After completing a task, mark it `[x]` in `docs/roadmap.md` immediately.
+- Never hallucinate tasks not in the roadmap.
+
+---
+
+## 2. TYPESCRIPT LAWS
+- Strict mode is ON. Zero `any` types — use `unknown` and narrow properly.
+- All functions, components, and hooks must have explicit return types.
+- All Supabase query results must be typed via generated types from `src/types/database.ts`.
+- Use `zod` for ALL form and API input validation.
+
+---
+
+## 3. REACT / NEXT.JS LAWS
+- Functional components ONLY. No class components, ever.
+- All data fetching in Server Components where possible; use `'use client'` only when interaction/state requires it.
+- Favor **Server Actions** (`'use server'`) over API Routes for mutations.
+- Use `next/image` for all images. Never use raw `<img>` tags.
+- All dynamic routes use the App Router convention: `app/(group)/[param]/page.tsx`.
+
+---
+
+## 4. TAILWIND / UI LAWS
+- Mobile-first always: base styles for mobile, `md:` / `lg:` for larger.
+- Always use the `cn()` utility from `@/lib/utils` to merge class names.
+- Use shadcn/ui components as the base layer; extend via Tailwind, never override their internals directly.
+- No hardcoded color hex values in JSX. All colors via Tailwind tokens or CSS variables.
+
+---
+
+## 5. STORAGE (MINIO) LAWS
+- ALL file uploads must use pre-signed S3 PUT URLs generated server-side.
+- Never expose the MinIO secret key to the client.
+- Store the raw S3 `file_key` in the database alongside the full `file_url`.
+- Thumbnail generation happens client-side (canvas API) before the upload request.
+- Use `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` — no other S3 libraries.
+
+---
+
+## 6. SUPABASE / REALTIME LAWS
+- NEVER guess the schema. Use the `supabase` MCP tool (`list_tables`, `execute_sql`) to verify before coding.
+- All tables must have Row Level Security (RLS) enabled.
+- Real-time subscriptions use Supabase Realtime channels — no polling allowed.
+- Supabase client for Server Components: `src/lib/supabase/server.ts`.
+- Supabase client for Client Components: `src/lib/supabase/client.ts`.
+
+---
+
+## 7. MCP TOOL LAWS
+- `user-supabase`: MANDATORY for all DB schema changes (`apply_migration`) and verification (`list_tables`, `execute_sql`).
+- `user-brave-search` / `user-context7`: Use for any library version or best-practice lookups before writing boilerplate.
+- `user-puppeteer`: Use to self-test the running app before declaring a task complete.
+- `user-vercel`: Use to check deployment health and configure env vars after deploy.
+- `user-github`: Use to create branches and commit completed phases.
+
+---
+
+## 8. FILE STRUCTURE LAWS
+```
+src/
+  app/
+    (auth)/         # Login / register pages
+    (app)/          # Authenticated shell (sidebar layout)
+      channels/[channelId]/
+  components/
+    ui/             # shadcn primitives only
+    layout/         # Sidebar, Header, AppShell
+    chat/           # Chat-specific components
+    media/          # Media gallery components
+  features/
+    chat/           # Server actions, hooks, utils for chat
+    media/          # Server actions, hooks, utils for media
+    auth/           # Auth helpers
+  lib/
+    supabase/       # client.ts + server.ts
+    s3.ts           # MinIO S3 client + presign helpers
+    utils.ts        # cn(), formatters
+  types/
+    database.ts     # Auto-generated Supabase types
+```
+
+---
+
+## 9. GIT / COMMIT LAWS
+- Atomic, semantic commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`.
+- Never commit `.env.local` or secrets.
+- Offer a commit after every logical phase is complete.
+
+---
+
+## 10. SELF-TESTING LAW
+- Before declaring ANY task complete, use `user-puppeteer` to screenshot and verify the running page.
+- If a lint error exists after an edit, fix it before moving on.
