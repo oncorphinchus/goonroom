@@ -55,10 +55,17 @@ export function MessageList({
 
   useEffect(() => {
     if (!bottomRef.current) return;
-    // Instant scroll on first render; smooth on subsequent messages
-    bottomRef.current.scrollIntoView({
-      behavior: isFirstRender.current ? "instant" : "smooth",
-    });
+
+    const el = containerRef.current;
+    const isNearBottom = el
+      ? el.scrollHeight - el.scrollTop - el.clientHeight < 120
+      : true;
+
+    if (isFirstRender.current || isNearBottom) {
+      bottomRef.current.scrollIntoView({
+        behavior: isFirstRender.current ? "instant" : "smooth",
+      });
+    }
     isFirstRender.current = false;
   }, [messages]);
 

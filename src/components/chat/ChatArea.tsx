@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hash, Images } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "./MessageList";
@@ -27,25 +27,83 @@ export function ChatArea({
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
 
-  // One stable Supabase client for the lifetime of this component instance.
-  // The parent page passes key={channelId}, so this component fully unmounts
-  // and remounts on channel navigation — no manual reset logic needed.
   const supabase = useMemo(() => createClient(), []);
 
-  // Profile cache: avoids a round-trip for senders whose profiles are already
-  // in the initial batch. Lazily fetches profiles for new participants.
   const profileCache = useRef<Map<string, ProfileSnippet>>(new Map());
+  const inflightProfileFetches = useRef<Map<string, Promise<ProfileSnippet | null>>>(new Map());
 
-  // Populate cache from initial messages on mount.
+  const currentUserProfile = useRef<ProfileSnippet | null>(null);
+
+  // Seed the profile cache from initialMessages once on mount.
+  // This effect runs before the Realtime subscription effect because
+  // React fires effects in declaration order within the same render.
   useEffect(() => {
     initialMessages.forEach((m) => {
       if (m.profiles) profileCache.current.set(m.profiles.id, m.profiles);
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    currentUserProfile.current =
+      profileCache.current.get(currentUserId) ?? null;
+  }, [initialMessages, currentUserId]);
 
-  // Realtime subscription — scoped to this channel.
-  // Cleanup runs automatically when the component unmounts (channel switch
-  // triggers a full remount via the key={channelId} set by the parent).
+  // Deduplicated profile fetch — concurrent Realtime events for the same
+  // uncached user coalesce into a single database query.
+  const fetchProfile = useCallback(
+    async (userId: string): Promise<ProfileSnippet | null> => {
+      const cached = profileCache.current.get(userId);
+      if (cached) return cached;
+
+      const inflight = inflightProfileFetches.current.get(userId);
+      if (inflight) return inflight;
+
+      const promise = (async (): Promise<ProfileSnippet | null> => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .eq("id", userId)
+          .single();
+
+        if (data) profileCache.current.set(data.id, data);
+        inflightProfileFetches.current.delete(userId);
+        return data;
+      })();
+
+      inflightProfileFetches.current.set(userId, promise);
+      return promise;
+    },
+    [supabase]
+  );
+
+  // Push an optimistic (pending) message into local state immediately.
+  const addOptimisticMessage = useCallback(
+    (content: string) => {
+      const tempId = crypto.randomUUID();
+
+      const pending: MessageWithProfile = {
+        id: tempId,
+        channel_id: channel.id,
+        user_id: currentUserId,
+        content,
+        created_at: new Date().toISOString(),
+        profiles: currentUserProfile.current,
+        _pending: true,
+      };
+
+      setMessages((prev) => [...prev, pending]);
+    },
+    [channel.id, currentUserId]
+  );
+
+  const removeOptimisticMessage = useCallback((content: string) => {
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m._pending && m.content === content);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next.splice(idx, 1);
+      return next;
+    });
+  }, []);
+
+  // Realtime subscription — reconciles optimistic messages with confirmed rows.
   useEffect(() => {
     const subscription = supabase
       .channel(`messages-channel-${channel.id}`)
@@ -59,42 +117,41 @@ export function ChatArea({
         },
         async (payload) => {
           const raw = payload.new as Tables<"messages">;
+          const profile = await fetchProfile(raw.user_id);
 
-          // Try cache first, then fetch.
-          let profile: ProfileSnippet | null =
-            profileCache.current.get(raw.user_id) ?? null;
-
-          if (!profile) {
-            const { data } = await supabase
-              .from("profiles")
-              .select("id, username, avatar_url")
-              .eq("id", raw.user_id)
-              .single();
-
-            if (data) {
-              profileCache.current.set(data.id, data);
-              profile = data;
+          setMessages((prev) => {
+            // If this is the current user's message, replace the earliest
+            // pending message with matching content — that's the optimistic
+            // placeholder we inserted on send.
+            if (raw.user_id === currentUserId) {
+              const pendingIdx = prev.findIndex(
+                (m) => m._pending && m.content === raw.content
+              );
+              if (pendingIdx !== -1) {
+                const next = [...prev];
+                next[pendingIdx] = { ...raw, profiles: profile };
+                return next;
+              }
             }
-          }
 
-          setMessages((prev) => [...prev, { ...raw, profiles: profile }]);
+            // Otherwise it's someone else's message (or no pending match).
+            // Guard against duplicates — Realtime can occasionally re-deliver.
+            if (prev.some((m) => m.id === raw.id)) return prev;
+            return [...prev, { ...raw, profiles: profile }];
+          });
         }
       )
       .subscribe();
 
-    // CRITICAL: unsubscribe on unmount to prevent WebSocket leaks.
     return () => {
       subscription.unsubscribe();
     };
-    // channel.id is stable for this component instance (key prop).
-    // supabase is stable (useMemo with [] deps).
-  }, [channel.id, supabase]);
+  }, [channel.id, supabase, currentUserId, fetchProfile]);
 
   const ChannelIcon = channel.type === "CHAT" ? Hash : Images;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Channel header */}
       <header className="flex h-12 shrink-0 items-center border-b border-[#1e1f22] bg-[#313338] px-4 shadow-sm">
         <ChannelIcon className="mr-2 h-5 w-5 shrink-0 text-[#8e9297]" />
         <span className="font-semibold text-white">{channel.name}</span>
@@ -114,7 +171,12 @@ export function ChatArea({
         channelName={channel.name}
       />
 
-      <MessageInput channelId={channel.id} channelName={channel.name} />
+      <MessageInput
+        channelId={channel.id}
+        channelName={channel.name}
+        onOptimisticSend={addOptimisticMessage}
+        onOptimisticFail={removeOptimisticMessage}
+      />
     </div>
   );
 }

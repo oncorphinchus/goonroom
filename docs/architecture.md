@@ -76,26 +76,26 @@ Extends `auth.users`. Auto-created via trigger on signup.
 
 ---
 
-## Upload Flow (MinIO Presigned URLs)
+## Media Loading Flow (Current)
 
 ```
-Client                  Next.js Server Action          MinIO
-  |                            |                          |
-  |-- POST /api/upload/presign-->|                         |
-  |   { filename, mime_type }   |-- PutObjectCommand ----->|
-  |                            |<-- presigned PUT URL ----|
-  |<-- { upload_url, file_key }--|                         |
-  |                             |                          |
-  |-- PUT upload_url (file) -------------------------------->|
-  |<-- 200 OK ------------------------------------------------|
-  |                             |                          |
-  |-- Server Action: insert media_attachments row          |
+Server Component              Client Grid                 Server Action
+  |                              |                             |
+  |-- select media_attachments -->|                            |
+  |   (first page, 40 rows)       |                            |
+  |<-- initialItems + total ------|                            |
+  |                               |                            |
+  |                               |-- IntersectionObserver --> |
+  |                               |   fetchMediaPage()         |
+  |                               |<-- next page + hasMore ----|
+  |                               |                            |
+  |                               |-- optional theater open -->|
 ```
 
-Key rules:
-- The MinIO secret key **never** reaches the client.
-- Thumbnails are generated client-side (canvas API) and uploaded separately as a second presigned PUT.
-- `file_key` is stored for future URL migration (if MinIO domain changes).
+Current notes:
+- Media browsing is implemented (sort, grid-size toggle, infinite scroll, theater).
+- Upload UI + persistence flow is not implemented yet (roadmap item 4.4).
+- `src/lib/s3.ts` already provides presigned upload helpers for future upload integration.
 
 ---
 
@@ -109,7 +109,8 @@ supabase
   .subscribe()
 ```
 
-Media channels subscribe similarly on `media_attachments` for live gallery updates.
+Media gallery currently does **not** subscribe to realtime updates yet.
+Live media inserts remain a roadmap item (`docs/roadmap.md` 4.6).
 
 ---
 
@@ -126,12 +127,12 @@ src/
         page.tsx          # Renders ChatView or MediaView based on channel.type
   components/
     ui/                   # shadcn primitives
-    layout/               # Sidebar, AppShell
-    chat/                 # MessageList, MessageInput, MessageBubble
-    media/                # MediaGrid, MediaCard, UploadModal, TheaterModal
+    layout/               # Sidebar, NavBar
+    chat/                 # ChatArea, MessageList, MessageInput, MessageBubble
+    media/                # MediaArea, MediaToolbar, MediaGrid, MediaCard, MediaTheater
   features/
-    chat/                 # Server actions: sendMessage, deleteMessage
-    media/                # Server actions: getPresignedUrl, insertMedia, deleteMedia
+    chat/                 # Server action: sendMessage
+    media/                # Server query action: fetchMediaPage
     auth/                 # signIn, signUp, signOut server actions
   lib/
     supabase/

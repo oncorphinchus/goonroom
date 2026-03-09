@@ -30,6 +30,16 @@ export async function sendMessage(input: {
     return { error: "Not authenticated. Please sign in again." };
   }
 
+  const { data: channel, error: chanErr } = await supabase
+    .from("channels")
+    .select("id, type")
+    .eq("id", parsed.data.channelId)
+    .single();
+
+  if (chanErr || !channel || channel.type !== "CHAT") {
+    return { error: "Channel not found or not a text channel." };
+  }
+
   const { error: insertError } = await supabase.from("messages").insert({
     channel_id: parsed.data.channelId,
     user_id: user.id,

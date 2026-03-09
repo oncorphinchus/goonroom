@@ -1,7 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatArea } from "@/components/chat/ChatArea";
+import { MediaArea } from "@/components/media/MediaArea";
 import type { MessageWithProfile } from "@/types/chat";
+import type { MediaItem } from "@/types/media";
 
 interface ChannelPageProps {
   params: Promise<{ channelId: string }>;
@@ -15,38 +17,40 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) notFound();
+  if (!user) redirect("/login");
 
-  const [{ data: channel, error: channelError }, { data: rawMessages }] =
-    await Promise.all([
-      supabase
-        .from("channels")
-        .select("*")
-        .eq("id", channelId)
-        .single(),
-      supabase
-        .from("messages")
-        .select("*, profiles(id, username, avatar_url)")
-        .eq("channel_id", channelId)
-        .order("created_at", { ascending: true })
-        .limit(50),
-    ]);
+  const { data: channel, error: channelError } = await supabase
+    .from("channels")
+    .select("*")
+    .eq("id", channelId)
+    .single();
 
   if (channelError || !channel) notFound();
 
-  if (channel.type !== "CHAT") {
+  if (channel.type === "MEDIA") {
+    const { data: mediaItems, count } = await supabase
+      .from("media_attachments")
+      .select("*, profiles(id, username, avatar_url)", { count: "exact" })
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: false })
+      .limit(40);
+
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#5865f2]/10">
-          <span className="text-2xl">🖼️</span>
-        </div>
-        <p className="text-lg font-semibold text-white">{channel.name}</p>
-        <p className="text-sm text-[#8e9297]">
-          Media gallery view is coming in Phase 4.
-        </p>
-      </div>
+      <MediaArea
+        key={channelId}
+        channel={channel}
+        initialItems={(mediaItems ?? []) as MediaItem[]}
+        initialTotal={count ?? 0}
+      />
     );
   }
+
+  const { data: rawMessages } = await supabase
+    .from("messages")
+    .select("*, profiles(id, username, avatar_url)")
+    .eq("channel_id", channelId)
+    .order("created_at", { ascending: true })
+    .limit(50);
 
   return (
     <ChatArea

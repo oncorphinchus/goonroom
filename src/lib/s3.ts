@@ -13,18 +13,22 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const s3Client = new S3Client({
-  region: process.env.MINIO_REGION ?? "us-east-1",
-  endpoint: requireEnv("MINIO_ENDPOINT"),
-  credentials: {
-    accessKeyId: requireEnv("MINIO_ACCESS_KEY"),
-    secretAccessKey: requireEnv("MINIO_SECRET_KEY"),
-  },
-  forcePathStyle: true,
-});
+let _s3Client: S3Client | null = null;
 
-const BUCKET = process.env.MINIO_BUCKET ?? "goonroom";
-const PUBLIC_URL = requireEnv("MINIO_PUBLIC_URL");
+function getS3Client(): S3Client {
+  if (!_s3Client) {
+    _s3Client = new S3Client({
+      region: process.env.MINIO_REGION ?? "us-east-1",
+      endpoint: requireEnv("MINIO_ENDPOINT"),
+      credentials: {
+        accessKeyId: requireEnv("MINIO_ACCESS_KEY"),
+        secretAccessKey: requireEnv("MINIO_SECRET_KEY"),
+      },
+      forcePathStyle: true,
+    });
+  }
+  return _s3Client;
+}
 
 export interface PresignedUploadResult {
   uploadUrl: string;
@@ -37,18 +41,23 @@ export async function getPresignedUploadUrl(
   mimeType: string,
   prefix: "media" | "thumbnails" = "media"
 ): Promise<PresignedUploadResult> {
+  const bucket = process.env.MINIO_BUCKET ?? "goonroom";
+  const publicUrl = requireEnv("MINIO_PUBLIC_URL");
+
   const uuid = crypto.randomUUID();
   const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const fileKey = `${prefix}/${uuid}_${sanitized}`;
 
   const command = new PutObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucket,
     Key: fileKey,
     ContentType: mimeType,
   });
 
-  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
-  const fileUrl = `${PUBLIC_URL}/${BUCKET}/${fileKey}`;
+  const uploadUrl = await getSignedUrl(getS3Client(), command, {
+    expiresIn: 300,
+  });
+  const fileUrl = `${publicUrl}/${bucket}/${fileKey}`;
 
   return { uploadUrl, fileKey, fileUrl };
 }

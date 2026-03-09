@@ -8,11 +8,18 @@ import { sendMessage } from "@/features/chat/actions";
 interface MessageInputProps {
   channelId: string;
   channelName: string;
+  onOptimisticSend: (content: string) => void;
+  onOptimisticFail: (content: string) => void;
 }
 
 const MAX_HEIGHT_PX = 200;
 
-export function MessageInput({ channelId, channelName }: MessageInputProps) {
+export function MessageInput({
+  channelId,
+  channelName,
+  onOptimisticSend,
+  onOptimisticFail,
+}: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +48,12 @@ export function MessageInput({ channelId, channelName }: MessageInputProps) {
     resetTextareaHeight();
     textareaRef.current?.focus();
 
+    onOptimisticSend(trimmed);
+
     const result = await sendMessage({ channelId, content: trimmed });
 
     if (result?.error) {
+      onOptimisticFail(trimmed);
       setError(result.error);
       setContent(trimmed);
       if (textareaRef.current) {
@@ -92,8 +102,7 @@ export function MessageInput({ channelId, channelName }: MessageInputProps) {
             "flex-1 resize-none bg-transparent text-sm text-[#dcddde]",
             "placeholder:text-[#72767d] outline-none",
             "overflow-y-auto leading-5",
-            "disabled:opacity-60",
-            `max-h-[${MAX_HEIGHT_PX}px]`
+            "disabled:opacity-60"
           )}
           style={{ maxHeight: `${MAX_HEIGHT_PX}px` }}
         />
