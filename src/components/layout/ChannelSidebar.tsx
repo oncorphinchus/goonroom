@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Hash, MessageSquareText, ChevronDown, LogOut, Mic, Headphones, Plus, Copy } from "lucide-react";
+import { Hash, MessageSquareText, ChevronDown, LogOut, Settings, Plus, Copy } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/tooltip";
 import { signOut } from "@/features/auth/actions";
 import { createInvite } from "@/features/server/actions";
+import { CreateChannelModal } from "./CreateChannelModal";
+import { AvatarUploadModal } from "./AvatarUploadModal";
+import { ServerSettingsModal } from "./ServerSettingsModal";
 import type { Tables } from "@/types/database";
 
 interface ChannelSidebarProps {
@@ -96,8 +99,11 @@ export function ChannelSidebar({
   userRole,
 }: ChannelSidebarProps): React.ReactNode {
   const pathname = usePathname();
-  const router = useRouter();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [createChannelOpen, setCreateChannelOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
 
   const channelIdMatch = pathname.match(/\/channels\/([^/]+)/);
   const activeChannelId = channelIdMatch?.[1] ?? null;
@@ -111,6 +117,7 @@ export function ChannelSidebar({
     .sort((a, b) => a.position - b.position);
 
   const isAdmin = userRole === "owner" || userRole === "admin";
+  const isOwner = userRole === "owner";
 
   const initials = profile.username
     ? profile.username.slice(0, 2).toUpperCase()
@@ -127,7 +134,7 @@ export function ChannelSidebar({
       try {
         await navigator.clipboard.writeText(`${window.location.origin}/join/${result.data}`);
       } catch {
-        // Clipboard API may not be available in non-secure contexts
+        // Clipboard API may not be available
       }
     }
   }
@@ -138,24 +145,44 @@ export function ChannelSidebar({
         <h2 className="flex-1 truncate text-sm font-semibold text-white">
           {serverName}
         </h2>
-        {isAdmin && (
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={handleCreateInvite}
-                  className="flex h-6 w-6 items-center justify-center rounded text-[#8e9297] transition-colors hover:text-white"
-                >
-                  {inviteCode ? <Copy className="h-3.5 w-3.5 text-[#3ba55c]" /> : <Plus className="h-3.5 w-3.5" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="border-none bg-[#18191c] text-white">
-                {inviteCode ? "Invite copied!" : "Create Invite"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <div className="flex items-center gap-1">
+          {isAdmin && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    className="flex h-6 w-6 items-center justify-center rounded text-[#8e9297] transition-colors hover:text-white"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="border-none bg-[#18191c] text-white">
+                  Server Settings
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {isAdmin && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleCreateInvite}
+                    className="flex h-6 w-6 items-center justify-center rounded text-[#8e9297] transition-colors hover:text-white"
+                  >
+                    {inviteCode ? <Copy className="h-3.5 w-3.5 text-[#3ba55c]" /> : <Plus className="h-3.5 w-3.5" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="border-none bg-[#18191c] text-white">
+                  {inviteCode ? "Invite copied!" : "Create Invite"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-3">
@@ -179,7 +206,7 @@ export function ChannelSidebar({
         {isAdmin && (
           <button
             type="button"
-            onClick={() => router.push(`/servers/${serverId}`)}
+            onClick={() => setCreateChannelOpen(true)}
             className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-[#8e9297] transition-colors hover:bg-[#35373c] hover:text-[#dcddde]"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -189,12 +216,27 @@ export function ChannelSidebar({
       </div>
 
       <div className="flex h-[52px] shrink-0 items-center gap-2 bg-[#232428] px-2">
-        <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={profile.avatar_url ?? undefined} />
-          <AvatarFallback className="bg-[#5865f2] text-xs font-bold text-white">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setAvatarOpen(true)}
+                className="shrink-0 rounded-full transition-opacity hover:opacity-80"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={avatarUrl ?? undefined} />
+                  <AvatarFallback className="bg-[#5865f2] text-xs font-bold text-white">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="border-none bg-[#18191c] text-white">
+              Change avatar
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium leading-none text-white">
@@ -205,34 +247,6 @@ export function ChannelSidebar({
 
         <div className="flex items-center gap-0.5">
           <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded text-[#8e9297] transition-colors hover:bg-[#35373c] hover:text-white"
-                >
-                  <Mic className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="border-none bg-[#18191c] text-white">
-                Mute
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded text-[#8e9297] transition-colors hover:bg-[#35373c] hover:text-white"
-                >
-                  <Headphones className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="border-none bg-[#18191c] text-white">
-                Deafen
-              </TooltipContent>
-            </Tooltip>
-
             <Tooltip>
               <TooltipTrigger asChild>
                 <form action={signOut}>
@@ -251,6 +265,27 @@ export function ChannelSidebar({
           </TooltipProvider>
         </div>
       </div>
+
+      <CreateChannelModal
+        open={createChannelOpen}
+        onOpenChange={setCreateChannelOpen}
+        serverId={serverId}
+      />
+
+      <AvatarUploadModal
+        open={avatarOpen}
+        onOpenChange={setAvatarOpen}
+        currentAvatarUrl={avatarUrl}
+        onAvatarUpdated={(url) => setAvatarUrl(url)}
+      />
+
+      <ServerSettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        serverId={serverId}
+        serverName={serverName}
+        isOwner={isOwner}
+      />
     </aside>
   );
 }

@@ -5,6 +5,7 @@ import { Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { UploadModal } from "@/components/media/UploadModal";
 import { deleteMessage } from "@/features/chat/actions";
 import type { Tables } from "@/types/database";
 import type { MessageWithProfile } from "@/types/chat";
@@ -27,6 +28,7 @@ export function ChatArea({
 }: ChatAreaProps): React.ReactNode {
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -35,9 +37,6 @@ export function ChatArea({
 
   const currentUserProfile = useRef<ProfileSnippet | null>(null);
 
-  // Seed the profile cache from initialMessages once on mount.
-  // This effect runs before the Realtime subscription effect because
-  // React fires effects in declaration order within the same render.
   useEffect(() => {
     initialMessages.forEach((m) => {
       if (m.profiles) profileCache.current.set(m.profiles.id, m.profiles);
@@ -46,8 +45,6 @@ export function ChatArea({
       profileCache.current.get(currentUserId) ?? null;
   }, [initialMessages, currentUserId]);
 
-  // Deduplicated profile fetch — concurrent Realtime events for the same
-  // uncached user coalesce into a single database query.
   const fetchProfile = useCallback(
     async (userId: string): Promise<ProfileSnippet | null> => {
       const cached = profileCache.current.get(userId);
@@ -74,7 +71,6 @@ export function ChatArea({
     [supabase]
   );
 
-  // Push an optimistic (pending) message into local state immediately.
   const addOptimisticMessage = useCallback(
     (content: string) => {
       const tempId = crypto.randomUUID();
@@ -132,7 +128,6 @@ export function ChatArea({
     [],
   );
 
-  // Realtime subscription — reconciles optimistic messages with confirmed rows.
   useEffect(() => {
     const subscription = supabase
       .channel(`messages-channel-${channel.id}`)
@@ -149,9 +144,6 @@ export function ChatArea({
           const profile = await fetchProfile(raw.user_id);
 
           setMessages((prev) => {
-            // If this is the current user's message, replace the earliest
-            // pending message with matching content — that's the optimistic
-            // placeholder we inserted on send.
             if (raw.user_id === currentUserId) {
               const pendingIdx = prev.findIndex(
                 (m) => m._pending && m.content === raw.content
@@ -163,8 +155,6 @@ export function ChatArea({
               }
             }
 
-            // Otherwise it's someone else's message (or no pending match).
-            // Guard against duplicates — Realtime can occasionally re-deliver.
             if (prev.some((m) => m.id === raw.id)) return prev;
             return [...prev, { ...raw, profiles: profile }];
           });
@@ -192,12 +182,10 @@ export function ChatArea({
     };
   }, [channel.id, supabase, currentUserId, fetchProfile]);
 
-  const ChannelIcon = Hash;
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="flex h-12 shrink-0 items-center border-b border-[#1e1f22] bg-[#313338] px-4 shadow-sm">
-        <ChannelIcon className="mr-2 h-5 w-5 shrink-0 text-[#8e9297]" />
+        <Hash className="mr-2 h-5 w-5 shrink-0 text-[#8e9297]" />
         <span className="font-semibold text-white">{channel.name}</span>
         {channel.description && (
           <>
@@ -221,6 +209,16 @@ export function ChatArea({
         channelName={channel.name}
         onOptimisticSend={addOptimisticMessage}
         onOptimisticFail={removeOptimisticMessage}
+        onUploadClick={() => setUploadOpen(true)}
+      />
+
+      <UploadModal
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        channelId={channel.id}
+        onFileQueued={() => {}}
+        onFileComplete={() => {}}
+        onFileFailed={() => {}}
       />
     </div>
   );

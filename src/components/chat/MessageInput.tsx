@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Send, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sendMessage } from "@/features/chat/actions";
 
@@ -11,6 +11,7 @@ interface MessageInputProps {
   channelName: string;
   onOptimisticSend: (content: string) => void;
   onOptimisticFail: (content: string) => void;
+  onUploadClick?: () => void;
 }
 
 const MAX_HEIGHT_PX = 200;
@@ -21,6 +22,7 @@ export function MessageInput({
   channelName,
   onOptimisticSend,
   onOptimisticFail,
+  onUploadClick,
 }: MessageInputProps): React.ReactNode {
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -91,6 +93,21 @@ export function MessageInput({
           "transition-shadow focus-within:shadow-[0_0_0_2px_rgba(88,101,242,0.4)]"
         )}
       >
+        {onUploadClick && (
+          <button
+            type="button"
+            onClick={onUploadClick}
+            aria-label="Upload file"
+            className={cn(
+              "mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+              "text-[#b5bac1] transition-colors",
+              "hover:text-[#dcddde] hover:bg-[#35373c]",
+            )}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
+
         <textarea
           ref={textareaRef}
           value={content}

@@ -168,6 +168,59 @@ export async function createInvite(
   return { data: code };
 }
 
+const updateServerSchema = z.object({
+  serverId: z.string().uuid(),
+  name: z.string().min(1, "Server name is required").max(100),
+});
+
+export async function updateServer(
+  input: z.input<typeof updateServerSchema>,
+): Promise<{ error?: string }> {
+  const parsed = updateServerSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
+  if (role !== "owner" && role !== "admin") return { error: "Only admins can update server settings." };
+
+  const { error } = await supabase
+    .from("servers")
+    .update({ name: parsed.data.name })
+    .eq("id", parsed.data.serverId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+const deleteServerSchema = z.object({
+  serverId: z.string().uuid(),
+});
+
+export async function deleteServer(
+  input: z.input<typeof deleteServerSchema>,
+): Promise<{ error?: string }> {
+  const parsed = deleteServerSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
+  if (role !== "owner") return { error: "Only the server owner can delete the server." };
+
+  const { error } = await supabase
+    .from("servers")
+    .delete()
+    .eq("id", parsed.data.serverId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function getServerMembers(
   serverId: string,
 ): Promise<ServerMemberWithProfile[]> {
