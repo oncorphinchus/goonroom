@@ -25,6 +25,16 @@ export default async function PostPage({ params }: PostPageProps): Promise<React
 
   if (!channel || channel.type !== "FORUM") notFound();
 
+  const { data: memberRow } = await supabase
+    .from("server_members")
+    .select("role")
+    .eq("server_id", serverId)
+    .eq("user_id", user.id)
+    .single();
+
+  const isAdmin =
+    memberRow?.role === "owner" || memberRow?.role === "admin";
+
   const { data: post } = await supabase
     .from("forum_posts")
     .select("*, profiles(id, username, avatar_url)")
@@ -59,6 +69,7 @@ export default async function PostPage({ params }: PostPageProps): Promise<React
       initialMedia={(mediaResult.data ?? []) as MediaItem[]}
       initialMediaTotal={mediaResult.count ?? 0}
       currentUserId={user.id}
+      isAdmin={isAdmin}
     />
   );
 }

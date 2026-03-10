@@ -19,6 +19,7 @@ interface ThreadViewProps {
   initialMedia: MediaItem[];
   initialMediaTotal: number;
   currentUserId: string;
+  isAdmin?: boolean;
 }
 
 type ThreadTab = "chat" | "media";
@@ -31,6 +32,7 @@ export function ThreadView({
   initialMedia,
   initialMediaTotal,
   currentUserId,
+  isAdmin = false,
 }: ThreadViewProps): React.ReactNode {
   const router = useRouter();
   const [tab, setTab] = useState<ThreadTab>("chat");
@@ -96,6 +98,7 @@ export function ThreadView({
           post={post}
           initialMessages={initialMessages}
           currentUserId={currentUserId}
+          isAdmin={isAdmin}
         />
       ) : (
         <ForumMediaTab

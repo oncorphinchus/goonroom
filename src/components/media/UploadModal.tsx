@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Film,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn, formatBytes } from "@/lib/utils";
 import {
   Dialog,
@@ -299,10 +300,12 @@ export function UploadModal({
         }
 
         updateEntry(entry.id, { status: "done", progress: 100 });
+        toast.success("Upload complete");
         callbackRefs.current.onFileComplete(entry.id, result.data);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Upload failed";
         updateEntry(entry.id, { status: "error", error: msg });
+        toast.error(msg);
         callbackRefs.current.onFileFailed(entry.id);
       }
     },

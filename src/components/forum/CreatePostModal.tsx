@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { createForumPost } from "@/features/forum/actions";
 
@@ -47,11 +48,13 @@ export function CreatePostModal({
 
     if (result.error) {
       setError(result.error);
+      toast.error(result.error);
       setLoading(false);
       return;
     }
 
     if (result.data) {
+      toast.success("Post created");
       onOpenChange(false);
       setTitle("");
       setContent("");

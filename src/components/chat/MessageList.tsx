@@ -38,18 +38,64 @@ function groupMessages(messages: MessageWithProfile[]): MessageGroup[] {
   return groups;
 }
 
+function formatDateSeparator(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+
+  if (msgStart.getTime() === todayStart.getTime()) {
+    return "Today";
+  }
+
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  if (msgStart.getTime() === yesterdayStart.getTime()) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getDateKey(dateString: string): string {
+  const d = new Date(dateString);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 interface MessageListProps {
   messages: MessageWithProfile[];
   currentUserId: string;
   channelName: string;
+  isAdmin?: boolean;
   onDeleteMessage: (messageId: string) => void;
+  onEditMessage: (messageId: string, content: string) => void;
+  onReplyToMessage: (message: MessageWithProfile) => void;
+  onAddReaction: (messageId: string, emoji: string) => void;
+  onRemoveReaction: (messageId: string, emoji: string) => void;
+  onPinMessage?: (messageId: string, currentlyPinned: boolean) => void;
+  onScrollToMessageRef?: (fn: (messageId: string) => void) => void;
 }
 
 export function MessageList({
   messages,
   currentUserId,
   channelName,
+  isAdmin = false,
   onDeleteMessage,
+  onEditMessage,
+  onReplyToMessage,
+  onAddReaction,
+  onRemoveReaction,
+  onPinMessage,
+  onScrollToMessageRef,
 }: MessageListProps): React.ReactNode {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,7 +117,23 @@ export function MessageList({
     isFirstRender.current = false;
   }, [messages]);
 
+  const scrollToMessage = (messageId: string): void => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("bg-[#5865f2]/10");
+      setTimeout(() => el.classList.remove("bg-[#5865f2]/10"), 2000);
+    }
+  };
+
+  useEffect(() => {
+    onScrollToMessageRef?.(scrollToMessage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onScrollToMessageRef]);
+
   const groups = groupMessages(messages);
+
+  let lastDateKey = "";
 
   return (
     <div
@@ -84,7 +146,9 @@ export function MessageList({
         <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#3f4147]">
           <Hash className="h-8 w-8 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-white">Welcome to #{channelName}</h2>
+        <h2 className="text-2xl font-bold text-white">
+          Welcome to #{channelName}
+        </h2>
         <p className="mt-1 text-sm text-[#8e9297]">
           This is the beginning of the #{channelName} channel.
         </p>
@@ -100,14 +164,38 @@ export function MessageList({
             No messages yet. Say hello!
           </p>
         ) : (
-          groups.map((group) => (
-            <MessageBubble
-              key={group.key}
-              group={group}
-              isOwn={group.userId === currentUserId}
-              onDeleteMessage={onDeleteMessage}
-            />
-          ))
+          groups.map((group) => {
+            const dateKey = getDateKey(group.timestamp);
+            const showSeparator = dateKey !== lastDateKey;
+            lastDateKey = dateKey;
+
+            return (
+              <div key={group.key}>
+                {showSeparator && (
+                  <div className="my-2 flex items-center gap-2 px-2">
+                    <div className="flex-1 border-t border-[#3f4147]" />
+                    <span className="text-xs font-semibold text-[#8e9297]">
+                      {formatDateSeparator(group.timestamp)}
+                    </span>
+                    <div className="flex-1 border-t border-[#3f4147]" />
+                  </div>
+                )}
+                <MessageBubble
+                  group={group}
+                  isOwn={group.userId === currentUserId}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onDeleteMessage={onDeleteMessage}
+                  onEditMessage={onEditMessage}
+                  onReplyToMessage={onReplyToMessage}
+                  onAddReaction={onAddReaction}
+                  onRemoveReaction={onRemoveReaction}
+                  onPinMessage={onPinMessage}
+                  onScrollToMessage={scrollToMessage}
+                />
+              </div>
+            );
+          })
         )}
       </div>
 

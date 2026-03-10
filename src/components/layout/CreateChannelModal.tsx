@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Hash, MessageSquareText } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -54,6 +55,7 @@ export function CreateChannelModal({
 
     if (result.error) {
       setError(result.error);
+      toast.error(result.error);
       setLoading(false);
       return;
     }
@@ -61,6 +63,7 @@ export function CreateChannelModal({
     setLoading(false);
     reset();
     onOpenChange(false);
+    toast.success("Channel created");
     router.refresh();
   }
 

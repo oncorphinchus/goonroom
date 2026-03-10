@@ -1,14 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Send, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Send, Plus, X, Reply } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { sendMessage } from "@/features/chat/actions";
+import type { ReplySnippet } from "@/types/chat";
 
 interface MessageInputProps {
   channelId: string;
   postId?: string;
   channelName: string;
+  replyingTo?: ReplySnippet | null;
+  onCancelReply?: () => void;
   onOptimisticSend: (content: string) => void;
   onOptimisticFail: (content: string) => void;
   onUploadClick?: () => void;
@@ -20,77 +24,112 @@ export function MessageInput({
   channelId,
   postId,
   channelName,
+  replyingTo,
+  onCancelReply,
   onOptimisticSend,
   onOptimisticFail,
   onUploadClick,
 }: MessageInputProps): React.ReactNode {
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const resetTextareaHeight = () => {
+  useEffect(() => {
+    if (replyingTo) {
+      textareaRef.current?.focus();
+    }
+  }, [replyingTo]);
+
+  const resetTextareaHeight = (): void => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     setContent(e.target.value);
     const ta = e.target;
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, MAX_HEIGHT_PX)}px`;
   };
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     const trimmed = content.trim();
     if (!trimmed || isSending) return;
 
     setIsSending(true);
-    setError(null);
     setContent("");
     resetTextareaHeight();
     textareaRef.current?.focus();
 
     onOptimisticSend(trimmed);
 
-    const result = await sendMessage({ channelId, postId, content: trimmed });
+    const result = await sendMessage({
+      channelId,
+      postId,
+      replyToId: replyingTo?.id ?? null,
+      content: trimmed,
+    });
 
     if (result?.error) {
       onOptimisticFail(trimmed);
-      setError(result.error);
+      toast.error(result.error);
       setContent(trimmed);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
         textareaRef.current.style.height = `${Math.min(
           textareaRef.current.scrollHeight,
-          MAX_HEIGHT_PX
+          MAX_HEIGHT_PX,
         )}px`;
       }
+    } else {
+      onCancelReply?.();
     }
 
     setIsSending(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
+    }
+    if (e.key === "Escape" && replyingTo) {
+      onCancelReply?.();
     }
   };
 
   return (
     <div className="shrink-0 px-4 pb-6 pt-2">
-      {error && (
-        <p className="mb-1.5 text-xs text-[#ed4245]" role="alert">
-          {error}
-        </p>
+      {/* Reply preview bar */}
+      {replyingTo && (
+        <div className="mb-1.5 flex items-center gap-2 rounded-t-lg bg-[#2b2d31] px-3 py-2">
+          <Reply className="h-3.5 w-3.5 shrink-0 text-[#b5bac1]" />
+          <span className="text-xs text-[#b5bac1]">
+            Replying to{" "}
+            <span className="font-semibold text-white">
+              {replyingTo.username}
+            </span>
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-[#72767d]">
+            {replyingTo.content.slice(0, 100)}
+          </span>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[#72767d] transition-colors hover:text-white"
+            aria-label="Cancel reply"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
 
       <div
         className={cn(
           "flex items-end gap-2 rounded-lg bg-[#40444b] px-3 py-2.5",
-          "transition-shadow focus-within:shadow-[0_0_0_2px_rgba(88,101,242,0.4)]"
+          replyingTo && "rounded-t-none",
+          "transition-shadow focus-within:shadow-[0_0_0_2px_rgba(88,101,242,0.4)]",
         )}
       >
         {onUploadClick && (
@@ -121,7 +160,7 @@ export function MessageInput({
             "flex-1 resize-none bg-transparent text-sm text-[#dcddde]",
             "placeholder:text-[#72767d] outline-none",
             "overflow-y-auto leading-5",
-            "disabled:opacity-60"
+            "disabled:opacity-60",
           )}
           style={{ maxHeight: `${MAX_HEIGHT_PX}px` }}
         />
@@ -135,7 +174,7 @@ export function MessageInput({
             "mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded",
             "text-[#72767d] transition-colors",
             "hover:text-[#dcddde]",
-            "disabled:cursor-not-allowed disabled:opacity-40"
+            "disabled:cursor-not-allowed disabled:opacity-40",
           )}
         >
           <Send className="h-4 w-4" />
@@ -143,7 +182,7 @@ export function MessageInput({
       </div>
 
       <p className="mt-1 text-xs text-[#4f545c]">
-        Enter to send&nbsp;&nbsp;·&nbsp;&nbsp;Shift + Enter for newline
+        Enter to send&nbsp;&nbsp;&middot;&nbsp;&nbsp;Shift + Enter for newline
       </p>
     </div>
   );

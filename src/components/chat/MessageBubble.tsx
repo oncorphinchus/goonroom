@@ -1,25 +1,164 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Pencil, Reply, Smile, Trash2, Pin } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, formatMessageTime } from "@/lib/utils";
-import type { MessageGroup } from "@/types/chat";
+import { MessageMarkdown } from "./MessageMarkdown";
+import { ReactionBar } from "./ReactionBar";
+import { EmojiPicker } from "./EmojiPicker";
+import { LinkPreview } from "./LinkPreview";
+import type { MessageGroup, MessageWithProfile } from "@/types/chat";
+
+const URL_REGEX = /https?:\/\/[^\s<>"]+/;
 
 interface MessageBubbleProps {
   group: MessageGroup;
   isOwn: boolean;
+  currentUserId: string;
+  isAdmin?: boolean;
   onDeleteMessage: (messageId: string) => void;
+  onEditMessage: (messageId: string, content: string) => void;
+  onReplyToMessage: (message: MessageWithProfile) => void;
+  onAddReaction: (messageId: string, emoji: string) => void;
+  onRemoveReaction: (messageId: string, emoji: string) => void;
+  onPinMessage?: (messageId: string, currentlyPinned: boolean) => void;
+  onScrollToMessage?: (messageId: string) => void;
+}
+
+function ActionToolbar({
+  isOwn,
+  isAdmin,
+  isPinned,
+  onEdit,
+  onReply,
+  onDelete,
+  onReact,
+  onPin,
+}: {
+  isOwn: boolean;
+  isAdmin: boolean;
+  isPinned: boolean;
+  onEdit: () => void;
+  onReply: () => void;
+  onDelete: () => void;
+  onReact: () => void;
+  onPin: () => void;
+}): React.ReactNode {
+  return (
+    <div
+      className={cn(
+        "absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded border border-[#1e1f22] bg-[#2b2d31] p-0.5 shadow-md",
+        "opacity-0 transition-opacity group-hover/msg:opacity-100",
+      )}
+    >
+      {isOwn && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex h-6 w-6 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
+          aria-label="Edit message"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onReply}
+        className="flex h-6 w-6 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
+        aria-label="Reply"
+      >
+        <Reply className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onReact}
+        className="flex h-6 w-6 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
+        aria-label="Add reaction"
+      >
+        <Smile className="h-3.5 w-3.5" />
+      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={onPin}
+          className={cn(
+            "flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-[#404249]",
+            isPinned ? "text-[#faa61a] hover:text-[#faa61a]" : "text-[#b5bac1] hover:text-white",
+          )}
+          aria-label={isPinned ? "Unpin message" : "Pin message"}
+        >
+          <Pin className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {isOwn && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex h-6 w-6 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#ed4245]/20 hover:text-[#ed4245]"
+          aria-label="Delete message"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function MessageBubble({
   group,
   isOwn,
+  currentUserId,
+  isAdmin = false,
   onDeleteMessage,
-}: MessageBubbleProps) {
+  onEditMessage,
+  onReplyToMessage,
+  onAddReaction,
+  onRemoveReaction,
+  onPinMessage,
+  onScrollToMessage,
+}: MessageBubbleProps): React.ReactNode {
   const initials = group.username.slice(0, 2).toUpperCase();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  function startEdit(message: MessageWithProfile): void {
+    setEditingId(message.id);
+    setEditContent(message.content);
+    setTimeout(() => editRef.current?.focus(), 0);
+  }
+
+  function cancelEdit(): void {
+    setEditingId(null);
+    setEditContent("");
+  }
+
+  function saveEdit(messageId: string): void {
+    const trimmed = editContent.trim();
+    if (!trimmed) {
+      toast.error("Message cannot be empty");
+      return;
+    }
+    onEditMessage(messageId, trimmed);
+    setEditingId(null);
+    setEditContent("");
+  }
+
+  function handleReactionToggle(messageId: string, emoji: string): void {
+    const msg = group.messages.find((m) => m.id === messageId);
+    const existing = msg?._reactions?.find((r) => r.emoji === emoji);
+    if (existing?.userIds.includes(currentUserId)) {
+      onRemoveReaction(messageId, emoji);
+    } else {
+      onAddReaction(messageId, emoji);
+    }
+  }
 
   return (
-    <div className="group flex items-start gap-3 rounded px-2 py-0.5 hover:bg-[#2e3035] transition-colors">
+    <div className="group flex items-start gap-3 rounded px-2 py-0.5 transition-colors hover:bg-[#2e3035]">
       <Avatar className="mt-0.5 h-10 w-10 shrink-0 cursor-pointer">
         <AvatarImage src={group.avatarUrl ?? undefined} alt={group.username} />
         <AvatarFallback className="bg-[#5865f2] text-xs font-bold text-white select-none">
@@ -32,7 +171,7 @@ export function MessageBubble({
           <span
             className={cn(
               "text-sm font-medium",
-              isOwn ? "text-[#5865f2]" : "text-white"
+              isOwn ? "text-[#5865f2]" : "text-white",
             )}
           >
             {group.username}
@@ -43,30 +182,158 @@ export function MessageBubble({
         </div>
 
         {group.messages.map((message) => (
-          <div key={message.id} className="group/msg relative flex items-start">
-            <p
-              className={cn(
-                "mt-0.5 break-words text-sm leading-relaxed flex-1",
-                message._pending ? "text-[#72767d] italic" : "text-[#dcddde]"
-              )}
-            >
-              {message.content}
-            </p>
-
-            {isOwn && !message._pending && (
+          <div
+            key={message.id}
+            id={`msg-${message.id}`}
+            className="group/msg relative"
+          >
+            {/* Reply quote block */}
+            {message._replyTo && (
               <button
                 type="button"
-                onClick={() => onDeleteMessage(message.id)}
-                className={cn(
-                  "ml-1 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded",
-                  "text-[#72767d] opacity-0 transition-opacity",
-                  "hover:bg-[#ed4245]/20 hover:text-[#ed4245]",
-                  "group-hover/msg:opacity-100"
-                )}
-                aria-label="Delete message"
+                onClick={() =>
+                  onScrollToMessage?.(message._replyTo!.id)
+                }
+                className="mb-0.5 flex items-center gap-1.5 rounded bg-[#2b2d31] px-2 py-1 text-xs transition-colors hover:bg-[#35373c]"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Reply className="h-3 w-3 shrink-0 text-[#72767d]" />
+                <span className="font-medium text-[#b5bac1]">
+                  {message._replyTo.username}
+                </span>
+                <span className="truncate text-[#72767d]">
+                  {message._replyTo.content.slice(0, 100)}
+                </span>
               </button>
+            )}
+
+            {/* Action toolbar */}
+            {!message._pending && (
+              <ActionToolbar
+                isOwn={isOwn}
+                isAdmin={isAdmin}
+                isPinned={message.pinned}
+                onEdit={() => startEdit(message)}
+                onReply={() => onReplyToMessage(message)}
+                onDelete={() => onDeleteMessage(message.id)}
+                onReact={() =>
+                  setEmojiPickerMsgId(
+                    emojiPickerMsgId === message.id ? null : message.id,
+                  )
+                }
+                onPin={() => onPinMessage?.(message.id, message.pinned)}
+              />
+            )}
+
+            {/* Inline emoji picker */}
+            {emojiPickerMsgId === message.id && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setEmojiPickerMsgId(null)}
+                />
+                <div className="absolute right-0 top-6 z-50">
+                  <EmojiPicker
+                    onSelect={(emoji) => {
+                      onAddReaction(message.id, emoji);
+                      setEmojiPickerMsgId(null);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Message content or edit textarea */}
+            {editingId === message.id ? (
+              <div className="mt-0.5">
+                <textarea
+                  ref={editRef}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      saveEdit(message.id);
+                    }
+                    if (e.key === "Escape") {
+                      cancelEdit();
+                    }
+                  }}
+                  className="w-full resize-none rounded bg-[#40444b] px-2 py-1.5 text-sm text-[#dcddde] outline-none"
+                  rows={Math.min(
+                    editContent.split("\n").length + 1,
+                    8,
+                  )}
+                />
+                <p className="mt-0.5 text-xs text-[#72767d]">
+                  Esc to{" "}
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="text-[#00aff4] hover:underline"
+                  >
+                    cancel
+                  </button>
+                  {" "}&middot; Enter to{" "}
+                  <button
+                    type="button"
+                    onClick={() => saveEdit(message.id)}
+                    className="text-[#00aff4] hover:underline"
+                  >
+                    save
+                  </button>
+                </p>
+              </div>
+            ) : (
+              <div className="mt-0.5 flex items-baseline gap-1">
+                <div
+                  className={cn(
+                    "min-w-0 flex-1 break-words text-sm leading-relaxed",
+                    message._pending
+                      ? "italic text-[#72767d]"
+                      : "text-[#dcddde]",
+                  )}
+                >
+                  {message._pending ? (
+                    <span>{message.content}</span>
+                  ) : (
+                    <MessageMarkdown content={message.content} />
+                  )}
+                </div>
+                {message.edited_at && (
+                  <span
+                    className="shrink-0 text-[10px] text-[#72767d]"
+                    title={new Date(message.edited_at).toLocaleString()}
+                  >
+                    (edited)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Link preview */}
+            {!message._pending && (() => {
+              const match = message.content.match(URL_REGEX);
+              return match ? <LinkPreview url={match[0]} /> : null;
+            })()}
+
+            {/* Pinned indicator */}
+            {message.pinned && !message._pending && (
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] text-[#faa61a]">
+                <Pin className="h-2.5 w-2.5" />
+                <span>Pinned</span>
+              </div>
+            )}
+
+            {/* Reactions */}
+            {message._reactions && message._reactions.length > 0 && (
+              <ReactionBar
+                reactions={message._reactions}
+                currentUserId={currentUserId}
+                onToggle={(emoji) =>
+                  handleReactionToggle(message.id, emoji)
+                }
+                onPickNew={(emoji) => onAddReaction(message.id, emoji)}
+              />
             )}
           </div>
         ))}

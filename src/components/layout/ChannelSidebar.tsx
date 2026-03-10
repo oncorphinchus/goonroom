@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Hash, MessageSquareText, ChevronDown, LogOut, Settings, Plus, Copy } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -126,15 +127,16 @@ export function ChannelSidebar({
   async function handleCreateInvite(): Promise<void> {
     const result = await createInvite({ serverId });
     if (result.error) {
-      console.error("Failed to create invite:", result.error);
+      toast.error(result.error);
       return;
     }
     if (result.data) {
       setInviteCode(result.data);
       try {
         await navigator.clipboard.writeText(`${window.location.origin}/join/${result.data}`);
+        toast.success("Invite link copied");
       } catch {
-        // Clipboard API may not be available
+        toast.success("Invite created");
       }
     }
   }

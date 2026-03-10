@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { createServer } from "@/features/server/actions";
 
 export default function CreateServerPage(): React.ReactNode {
@@ -20,10 +21,12 @@ export default function CreateServerPage(): React.ReactNode {
     const result = await createServer({ name });
     if (result.error) {
       setError(result.error);
+      toast.error(result.error);
       setLoading(false);
       return;
     }
     if (result.data) {
+      toast.success("Server created");
       router.push(`/servers/${result.data.server.id}`);
     }
   }

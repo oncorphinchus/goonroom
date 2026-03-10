@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, Loader2, Upload } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +70,9 @@ export function AvatarUploadModal({
     });
 
     if (presignResult.error || !presignResult.data) {
-      setError(presignResult.error ?? "Failed to get upload URL.");
+      const errMsg = presignResult.error ?? "Failed to get upload URL.";
+      setError(errMsg);
+      toast.error(errMsg);
       setUploading(false);
       return;
     }
@@ -84,6 +87,7 @@ export function AvatarUploadModal({
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
     } catch {
       setError("Failed to upload image.");
+      toast.error("Failed to upload image.");
       setUploading(false);
       return;
     }
@@ -92,10 +96,12 @@ export function AvatarUploadModal({
 
     if (updateResult.error) {
       setError(updateResult.error);
+      toast.error(updateResult.error);
       setUploading(false);
       return;
     }
 
+    toast.success("Avatar updated");
     onAvatarUpdated(presignResult.data.fileUrl);
     setUploading(false);
     reset();

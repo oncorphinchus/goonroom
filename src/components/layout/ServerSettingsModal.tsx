@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -42,10 +43,12 @@ export function ServerSettingsModal({
     const result = await updateServer({ serverId, name: name.trim() });
     if (result.error) {
       setError(result.error);
+      toast.error(result.error);
       setSaving(false);
       return;
     }
 
+    toast.success("Server updated");
     setSaving(false);
     onOpenChange(false);
     router.refresh();
@@ -58,10 +61,12 @@ export function ServerSettingsModal({
     const result = await deleteServer({ serverId });
     if (result.error) {
       setError(result.error);
+      toast.error(result.error);
       setDeleting(false);
       return;
     }
 
+    toast.success("Server deleted");
     setDeleting(false);
     onOpenChange(false);
     router.push("/");

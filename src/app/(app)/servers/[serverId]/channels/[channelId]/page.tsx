@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ForumPostList } from "@/components/forum/ForumPostList";
-import type { MessageWithProfile } from "@/types/chat";
+import type { MessageWithProfile, ReactionGroup } from "@/types/chat";
 
 interface ChannelPageProps {
   params: Promise<{ serverId: string; channelId: string }>;
@@ -24,6 +24,16 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
 
   if (channelError || !channel) notFound();
 
+  const { data: memberRow } = await supabase
+    .from("server_members")
+    .select("role")
+    .eq("server_id", serverId)
+    .eq("user_id", user.id)
+    .single();
+
+  const isAdmin =
+    memberRow?.role === "owner" || memberRow?.role === "admin";
+
   if (channel.type === "FORUM") {
     return (
       <ForumPostList
@@ -42,12 +52,71 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
     .order("created_at", { ascending: true })
     .limit(50);
 
+  const msgs = (rawMessages ?? []) as MessageWithProfile[];
+
+  const replyIds = msgs
+    .map((m) => m.reply_to_id)
+    .filter((id): id is string => id !== null);
+
+  const replyMap = new Map<string, { id: string; content: string; username: string }>();
+  if (replyIds.length > 0) {
+    const { data: replyRows } = await supabase
+      .from("messages")
+      .select("id, content, profiles(username)")
+      .in("id", replyIds);
+
+    if (replyRows) {
+      for (const row of replyRows) {
+        const profile = row.profiles as { username: string } | null;
+        replyMap.set(row.id, {
+          id: row.id,
+          content: row.content,
+          username: profile?.username ?? "Unknown",
+        });
+      }
+    }
+  }
+
+  const msgIds = msgs.map((m) => m.id);
+  const reactionsMap = new Map<string, ReactionGroup[]>();
+  if (msgIds.length > 0) {
+    const { data: reactionRows } = await supabase
+      .from("message_reactions")
+      .select("message_id, emoji, user_id")
+      .in("message_id", msgIds);
+
+    if (reactionRows) {
+      const grouped = new Map<string, Map<string, string[]>>();
+      for (const r of reactionRows) {
+        if (!grouped.has(r.message_id)) grouped.set(r.message_id, new Map());
+        const emojiMap = grouped.get(r.message_id)!;
+        if (!emojiMap.has(r.emoji)) emojiMap.set(r.emoji, []);
+        emojiMap.get(r.emoji)!.push(r.user_id);
+      }
+
+      for (const [msgId, emojiMap] of grouped) {
+        const reactions: ReactionGroup[] = [];
+        for (const [emoji, userIds] of emojiMap) {
+          reactions.push({ emoji, userIds, count: userIds.length });
+        }
+        reactionsMap.set(msgId, reactions);
+      }
+    }
+  }
+
+  const enrichedMessages: MessageWithProfile[] = msgs.map((m) => ({
+    ...m,
+    _replyTo: m.reply_to_id ? replyMap.get(m.reply_to_id) ?? null : null,
+    _reactions: reactionsMap.get(m.id) ?? [],
+  }));
+
   return (
     <ChatArea
       key={channelId}
       channel={channel}
-      initialMessages={(rawMessages ?? []) as MessageWithProfile[]}
+      initialMessages={enrichedMessages}
       currentUserId={user.id}
+      isAdmin={isAdmin}
     />
   );
 }
