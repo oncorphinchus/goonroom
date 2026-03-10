@@ -99,6 +99,7 @@ export function ThreadView({
           initialMessages={initialMessages}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
+          serverId={serverId}
         />
       ) : (
         <ForumMediaTab

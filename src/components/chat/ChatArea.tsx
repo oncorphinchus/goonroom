@@ -24,6 +24,7 @@ interface ChatAreaProps {
   initialMessages: MessageWithProfile[];
   currentUserId: string;
   isAdmin?: boolean;
+  serverId?: string;
 }
 
 type ProfileSnippet = Pick<
@@ -36,6 +37,7 @@ export function ChatArea({
   initialMessages,
   currentUserId,
   isAdmin = false,
+  serverId,
 }: ChatAreaProps): React.ReactNode {
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
@@ -492,6 +494,7 @@ export function ChatArea({
         currentUserId={currentUserId}
         channelName={channel.name}
         isAdmin={isAdmin}
+        serverId={serverId}
         onDeleteMessage={handleDeleteMessage}
         onEditMessage={handleEditMessage}
         onReplyToMessage={handleReplyToMessage}

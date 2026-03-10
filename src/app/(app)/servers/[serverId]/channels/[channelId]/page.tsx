@@ -117,6 +117,7 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
       initialMessages={enrichedMessages}
       currentUserId={user.id}
       isAdmin={isAdmin}
+      serverId={serverId}
     />
   );
 }

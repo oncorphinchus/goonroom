@@ -9,6 +9,7 @@ import { MessageMarkdown } from "./MessageMarkdown";
 import { ReactionBar } from "./ReactionBar";
 import { EmojiPicker } from "./EmojiPicker";
 import { LinkPreview } from "./LinkPreview";
+import { UserProfileCard } from "@/components/layout/UserProfileCard";
 import type { MessageGroup, MessageWithProfile } from "@/types/chat";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/;
@@ -18,6 +19,7 @@ interface MessageBubbleProps {
   isOwn: boolean;
   currentUserId: string;
   isAdmin?: boolean;
+  serverId?: string;
   onDeleteMessage: (messageId: string) => void;
   onEditMessage: (messageId: string, content: string) => void;
   onReplyToMessage: (message: MessageWithProfile) => void;
@@ -111,6 +113,7 @@ export function MessageBubble({
   isOwn,
   currentUserId,
   isAdmin = false,
+  serverId,
   onDeleteMessage,
   onEditMessage,
   onReplyToMessage,
@@ -159,23 +162,28 @@ export function MessageBubble({
 
   return (
     <div className="group flex items-start gap-3 rounded px-2 py-0.5 transition-colors hover:bg-[#2e3035]">
-      <Avatar className="mt-0.5 h-10 w-10 shrink-0 cursor-pointer">
-        <AvatarImage src={group.avatarUrl ?? undefined} alt={group.username} />
-        <AvatarFallback className="bg-[#5865f2] text-xs font-bold text-white select-none">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
+      <UserProfileCard userId={group.userId} serverId={serverId}>
+        <Avatar className="mt-0.5 h-10 w-10 shrink-0 cursor-pointer">
+          <AvatarImage src={group.avatarUrl ?? undefined} alt={group.username} />
+          <AvatarFallback className="bg-[#5865f2] text-xs font-bold text-white select-none">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      </UserProfileCard>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 leading-none">
-          <span
-            className={cn(
-              "text-sm font-medium",
-              isOwn ? "text-[#5865f2]" : "text-white",
-            )}
-          >
-            {group.username}
-          </span>
+          <UserProfileCard userId={group.userId} serverId={serverId}>
+            <button
+              type="button"
+              className={cn(
+                "text-sm font-medium transition-opacity hover:opacity-80",
+                isOwn ? "text-[#5865f2]" : "text-white",
+              )}
+            >
+              {group.username}
+            </button>
+          </UserProfileCard>
           <span className="text-xs text-[#72767d]">
             {formatMessageTime(group.timestamp)}
           </span>

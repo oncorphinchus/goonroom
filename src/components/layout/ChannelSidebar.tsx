@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Hash, MessageSquareText, ChevronDown, LogOut, Settings, Plus, Copy } from "lucide-react";
+import { Hash, MessageSquareText, ChevronDown, LogOut, Settings, Plus, Copy, UserCog } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,7 @@ export function ChannelSidebar({
   userRole,
 }: ChannelSidebarProps): React.ReactNode {
   const pathname = usePathname();
+  const router = useRouter();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -248,6 +249,23 @@ export function ChannelSidebar({
         </div>
 
         <div className="flex items-center gap-0.5">
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => router.push("/settings")}
+                  className="flex h-8 w-8 items-center justify-center rounded text-[#8e9297] transition-colors hover:bg-[#35373c] hover:text-white"
+                >
+                  <UserCog className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="border-none bg-[#18191c] text-white">
+                User Settings
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>

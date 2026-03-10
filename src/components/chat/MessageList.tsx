@@ -75,6 +75,7 @@ interface MessageListProps {
   currentUserId: string;
   channelName: string;
   isAdmin?: boolean;
+  serverId?: string;
   onDeleteMessage: (messageId: string) => void;
   onEditMessage: (messageId: string, content: string) => void;
   onReplyToMessage: (message: MessageWithProfile) => void;
@@ -89,6 +90,7 @@ export function MessageList({
   currentUserId,
   channelName,
   isAdmin = false,
+  serverId,
   onDeleteMessage,
   onEditMessage,
   onReplyToMessage,
@@ -185,6 +187,7 @@ export function MessageList({
                   isOwn={group.userId === currentUserId}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
+                  serverId={serverId}
                   onDeleteMessage={onDeleteMessage}
                   onEditMessage={onEditMessage}
                   onReplyToMessage={onReplyToMessage}

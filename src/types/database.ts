@@ -266,18 +266,21 @@ export interface Database {
           id: string;
           username: string;
           avatar_url: string | null;
+          bio: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
           username: string;
           avatar_url?: string | null;
+          bio?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           username?: string;
           avatar_url?: string | null;
+          bio?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -419,6 +422,10 @@ export interface Database {
         Args: {
           p_invite_id: string;
         };
+        Returns: undefined;
+      };
+      delete_user: {
+        Args: Record<string, never>;
         Returns: undefined;
       };
     };

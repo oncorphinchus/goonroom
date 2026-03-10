@@ -153,16 +153,16 @@ Below are grouped phases covering every major Discord feature not yet in GoonRoo
 
 ### Phase 12: User Profile & Account Management
 
-- [ ] 12.1 **User settings page** — `/settings` route (or modal) with sidebar tabs: My Account, Profile, Appearance, Privacy
-- [ ] 12.2 **Change username** — `updateUsername` server action, username uniqueness check, zod validation (3–32 chars, alphanumeric + underscores), update `profiles.username`
+- [x] 12.1 **User settings page** — `/settings` route (or modal) with sidebar tabs: My Account, Profile, Appearance, Privacy
+- [x] 12.2 **Change username** — `updateUsername` server action, username uniqueness check, zod validation (3–32 chars, alphanumeric + underscores), update `profiles.username`
 - [ ] 12.3 **Change email** — `updateEmail` server action, Supabase `updateUser({ email })`, email confirmation flow, show pending email in settings
-- [ ] 12.4 **Change password** — `updatePassword` server action, Supabase `updateUser({ password })`, require current password confirmation, minimum 8 chars
-- [ ] 12.5 **User bio / "About Me"** — `bio` column on `profiles` (text, max 190 chars), editable in settings, displayed on profile card/popover
+- [x] 12.4 **Change password** — `updatePassword` server action, Supabase `updateUser({ password })`, require current password confirmation, minimum 8 chars
+- [x] 12.5 **User bio / "About Me"** — `bio` column on `profiles` (text, max 190 chars), editable in settings, displayed on profile card/popover
 - [ ] 12.6 **Custom status** — `custom_status` column on `profiles` (text, max 128 chars), emoji + text, shown next to username in sidebar and message bubbles
 - [ ] 12.7 **Profile banner image** — `banner_url` column on `profiles`, upload via presigned URL (like avatar), displayed on profile card header
-- [ ] 12.8 **User profile card / popover** — click username anywhere to open popover: avatar, banner, username, bio, custom status, roles in current server, member since date, "Message" button (future DM)
-- [ ] 12.9 **Account info display** — settings page shows: email, username, user ID, account creation date, linked auth providers
-- [ ] 12.10 **Delete account** — `deleteAccount` server action, confirmation modal ("type DELETE to confirm"), delete from `auth.users` (cascade clears profile, memberships), sign out, redirect to login
+- [x] 12.8 **User profile card / popover** — click username anywhere to open popover: avatar, banner, username, bio, custom status, roles in current server, member since date, "Message" button (future DM)
+- [x] 12.9 **Account info display** — settings page shows: email, username, user ID, account creation date, linked auth providers
+- [x] 12.10 **Delete account** — `deleteAccount` server action, confirmation modal ("type DELETE to confirm"), delete from `auth.users` (cascade clears profile, memberships), sign out, redirect to login
 - [ ] 12.11 **Avatar crop/resize** — before upload, show crop UI (circular mask), resize to 256×256 max, preview before confirming
 - [ ] 12.12 **Profile accent color** — `accent_color` column on `profiles` (hex string), color picker in settings, used as profile card accent bar
 

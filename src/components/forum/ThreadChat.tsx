@@ -29,6 +29,7 @@ interface ThreadChatProps {
   initialMessages: MessageWithProfile[];
   currentUserId: string;
   isAdmin?: boolean;
+  serverId?: string;
 }
 
 export function ThreadChat({
@@ -37,6 +38,7 @@ export function ThreadChat({
   initialMessages,
   currentUserId,
   isAdmin = false,
+  serverId,
 }: ThreadChatProps): React.ReactNode {
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
@@ -432,6 +434,7 @@ export function ThreadChat({
         currentUserId={currentUserId}
         channelName={post.title}
         isAdmin={isAdmin}
+        serverId={serverId}
         onDeleteMessage={handleDeleteMessage}
         onEditMessage={handleEditMessage}
         onReplyToMessage={handleReplyToMessage}
