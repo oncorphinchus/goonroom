@@ -1,0 +1,52 @@
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        MINIO_PUBLIC_HOSTNAME: ${MINIO_PUBLIC_HOSTNAME:-s3.gayniggasex.com}
+    container_name: goonroom-next
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET:-goonroom}
+      - MINIO_REGION=${MINIO_REGION:-us-east-1}
+      - MINIO_PUBLIC_HOSTNAME=${MINIO_PUBLIC_HOSTNAME:-s3.gayniggasex.com}
+    networks:
+      - goonroom-net
+    depends_on:
+      minio:
+        condition: service_started
+
+  minio:
+    image: minio/minio:latest
+    container_name: goonroom-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    networks:
+      - goonroom-net
+
+networks:
+  goonroom-net:
+    driver: bridge
+
+volumes:
+  minio-data:
+    driver: local

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const sendMessageSchema = z.object({
   channelId: z.string().uuid("Invalid channel ID"),
+  postId: z.string().uuid("Invalid post ID").nullable().optional(),
   content: z
     .string()
     .min(1, "Message cannot be empty")
@@ -13,6 +14,7 @@ const sendMessageSchema = z.object({
 
 export async function sendMessage(input: {
   channelId: string;
+  postId?: string | null;
   content: string;
 }): Promise<{ error: string } | undefined> {
   const parsed = sendMessageSchema.safeParse(input);
@@ -36,12 +38,38 @@ export async function sendMessage(input: {
     .eq("id", parsed.data.channelId)
     .single();
 
-  if (chanErr || !channel || channel.type !== "CHAT") {
-    return { error: "Channel not found or not a text channel." };
+  if (chanErr || !channel) {
+    return { error: "Channel not found." };
+  }
+
+  const postId = parsed.data.postId ?? null;
+
+  if (channel.type === "TEXT" && postId) {
+    return { error: "Text channels do not support posts." };
+  }
+
+  if (channel.type === "FORUM") {
+    if (!postId) {
+      return { error: "Forum channels require a post context." };
+    }
+    const { data: post, error: postErr } = await supabase
+      .from("forum_posts")
+      .select("id, locked")
+      .eq("id", postId)
+      .eq("channel_id", parsed.data.channelId)
+      .single();
+
+    if (postErr || !post) {
+      return { error: "Post not found in this channel." };
+    }
+    if (post.locked) {
+      return { error: "This post is locked." };
+    }
   }
 
   const { error: insertError } = await supabase.from("messages").insert({
     channel_id: parsed.data.channelId,
+    post_id: postId,
     user_id: user.id,
     content: parsed.data.content,
   });

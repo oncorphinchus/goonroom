@@ -41,7 +41,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isPublicPath =
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
-    pathname.startsWith("/auth/");
+    pathname.startsWith("/auth/") ||
+    pathname === "/offline";
 
   // Protect all non-public routes.
   if (!user && !isPublicPath) {
@@ -74,6 +75,6 @@ export const config = {
      * - favicon.ico
      * - Common static asset extensions
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

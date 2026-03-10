@@ -50,7 +50,7 @@ export function MessageList({
   currentUserId,
   channelName,
   onDeleteMessage,
-}: MessageListProps) {
+}: MessageListProps): React.ReactNode {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);

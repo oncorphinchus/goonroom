@@ -48,6 +48,10 @@ export function formatMessageTime(dateString: string): string {
   return `${date.toLocaleDateString("en-US")} ${timeStr}`;
 }
 
+export function isVideo(mimeType: string): boolean {
+  return mimeType.startsWith("video/");
+}
+
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

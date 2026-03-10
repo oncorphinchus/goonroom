@@ -1,46 +1,35 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatArea } from "@/components/chat/ChatArea";
-import { MediaArea } from "@/components/media/MediaArea";
+import { ForumPostList } from "@/components/forum/ForumPostList";
 import type { MessageWithProfile } from "@/types/chat";
-import type { MediaItem } from "@/types/media";
 
 interface ChannelPageProps {
-  params: Promise<{ channelId: string }>;
+  params: Promise<{ serverId: string; channelId: string }>;
 }
 
-export default async function ChannelPage({ params }: ChannelPageProps) {
-  const { channelId } = await params;
+export default async function ChannelPage({ params }: ChannelPageProps): Promise<React.ReactNode> {
+  const { serverId, channelId } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: channel, error: channelError } = await supabase
     .from("channels")
     .select("*")
     .eq("id", channelId)
+    .eq("server_id", serverId)
     .single();
 
   if (channelError || !channel) notFound();
 
-  if (channel.type === "MEDIA") {
-    const { data: mediaItems, count } = await supabase
-      .from("media_attachments")
-      .select("*, profiles(id, username, avatar_url)", { count: "exact" })
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: false })
-      .limit(40);
-
+  if (channel.type === "FORUM") {
     return (
-      <MediaArea
+      <ForumPostList
         key={channelId}
         channel={channel}
-        initialItems={(mediaItems ?? []) as MediaItem[]}
-        initialTotal={count ?? 0}
+        serverId={serverId}
       />
     );
   }
@@ -49,6 +38,7 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
     .from("messages")
     .select("*, profiles(id, username, avatar_url)")
     .eq("channel_id", channelId)
+    .is("post_id", null)
     .order("created_at", { ascending: true })
     .limit(50);
 

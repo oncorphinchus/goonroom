@@ -1,9 +1,11 @@
 "use client";
 
+import type { ElementType } from "react";
 import {
   ArrowDownAZ,
   ArrowUpDown,
   Calendar,
+  CloudUpload,
   Grid2x2,
   Grid3x3,
   HardDrive,
@@ -25,15 +27,16 @@ interface MediaToolbarProps {
   gridSize: GridSize;
   onSortChange: (sort: MediaSort) => void;
   onGridSizeChange: (size: GridSize) => void;
+  onUploadClick: () => void;
 }
 
-const sortOptions: { field: MediaSortField; label: string; icon: React.ElementType }[] = [
+const sortOptions: { field: MediaSortField; label: string; icon: ElementType }[] = [
   { field: "created_at", label: "Upload date", icon: Calendar },
   { field: "file_size", label: "File size", icon: HardDrive },
   { field: "file_name", label: "File name", icon: ArrowDownAZ },
 ];
 
-const gridOptions: { size: GridSize; label: string; icon: React.ElementType }[] = [
+const gridOptions: { size: GridSize; label: string; icon: ElementType }[] = [
   { size: "sm", label: "Small", icon: Grid3x3 },
   { size: "md", label: "Medium", icon: Grid2x2 },
   { size: "lg", label: "Large", icon: LayoutGrid },
@@ -45,6 +48,7 @@ export function MediaToolbar({
   gridSize,
   onSortChange,
   onGridSizeChange,
+  onUploadClick,
 }: MediaToolbarProps) {
   const activeSortLabel =
     sortOptions.find((o) => o.field === sort.field)?.label ?? "Sort";
@@ -55,6 +59,17 @@ export function MediaToolbar({
       <span className="mr-auto text-xs text-[#8e9297]">
         {totalCount} {totalCount === 1 ? "item" : "items"}
       </span>
+
+      {/* Upload button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 gap-1.5 text-xs text-[#b9bbbe] hover:bg-[#5865f2] hover:text-white"
+        onClick={onUploadClick}
+      >
+        <CloudUpload className="h-3.5 w-3.5" />
+        Upload
+      </Button>
 
       {/* Sort dropdown */}
       <DropdownMenu>

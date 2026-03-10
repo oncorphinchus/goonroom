@@ -21,3 +21,8 @@ export const GRID_COLUMNS: Record<GridSize, string> = {
 };
 
 export const PAGE_SIZE = 40;
+
+export interface PendingUpload {
+  tempId: string;
+  fileName: string;
+}

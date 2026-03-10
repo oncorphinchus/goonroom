@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Images } from "lucide-react";
+import { Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
@@ -24,7 +24,7 @@ export function ChatArea({
   channel,
   initialMessages,
   currentUserId,
-}: ChatAreaProps) {
+}: ChatAreaProps): React.ReactNode {
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
 
@@ -82,6 +82,7 @@ export function ChatArea({
       const pending: MessageWithProfile = {
         id: tempId,
         channel_id: channel.id,
+        post_id: null,
         user_id: currentUserId,
         content,
         created_at: new Date().toISOString(),
@@ -106,25 +107,29 @@ export function ChatArea({
 
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
-      const removed = messages.find((m) => m.id === messageId);
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      let removed: MessageWithProfile | undefined;
+      setMessages((prev) => {
+        removed = prev.find((m) => m.id === messageId);
+        return prev.filter((m) => m.id !== messageId);
+      });
 
       const result = await deleteMessage({ messageId });
 
       if (result?.error && removed) {
+        const rollback = removed;
         setMessages((prev) => {
           if (prev.some((m) => m.id === messageId)) return prev;
-          const next = [...prev, removed];
+          const next = [...prev, rollback];
           next.sort(
             (a, b) =>
               new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
+              new Date(b.created_at).getTime(),
           );
           return next;
         });
       }
     },
-    [messages]
+    [],
   );
 
   // Realtime subscription — reconciles optimistic messages with confirmed rows.
@@ -187,7 +192,7 @@ export function ChatArea({
     };
   }, [channel.id, supabase, currentUserId, fetchProfile]);
 
-  const ChannelIcon = channel.type === "CHAT" ? Hash : Images;
+  const ChannelIcon = Hash;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

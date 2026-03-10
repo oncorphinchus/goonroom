@@ -13,21 +13,50 @@ function requireEnv(name: string): string {
   return value;
 }
 
-let _s3Client: S3Client | null = null;
+function s3Credentials(): { accessKeyId: string; secretAccessKey: string } {
+  return {
+    accessKeyId: requireEnv("MINIO_ACCESS_KEY"),
+    secretAccessKey: requireEnv("MINIO_SECRET_KEY"),
+  };
+}
 
-function getS3Client(): S3Client {
-  if (!_s3Client) {
-    _s3Client = new S3Client({
-      region: process.env.MINIO_REGION ?? "us-east-1",
+const region = (): string => process.env.MINIO_REGION ?? "us-east-1";
+
+/**
+ * Internal S3 client — routes through Docker bridge (http://minio:9000).
+ * Use for server-only operations: listing, deleting, bucket management.
+ */
+let _internalClient: S3Client | null = null;
+
+function getInternalClient(): S3Client {
+  if (!_internalClient) {
+    _internalClient = new S3Client({
+      region: region(),
       endpoint: requireEnv("MINIO_ENDPOINT"),
-      credentials: {
-        accessKeyId: requireEnv("MINIO_ACCESS_KEY"),
-        secretAccessKey: requireEnv("MINIO_SECRET_KEY"),
-      },
+      credentials: s3Credentials(),
       forcePathStyle: true,
     });
   }
-  return _s3Client;
+  return _internalClient;
+}
+
+/**
+ * Public S3 client — uses the Cloudflare Tunnel URL (MINIO_PUBLIC_URL).
+ * Presigned URLs must be generated with this client so the browser can
+ * reach the signed endpoint and the Host header matches the signature.
+ */
+let _publicClient: S3Client | null = null;
+
+function getPublicClient(): S3Client {
+  if (!_publicClient) {
+    _publicClient = new S3Client({
+      region: region(),
+      endpoint: requireEnv("MINIO_PUBLIC_URL"),
+      credentials: s3Credentials(),
+      forcePathStyle: true,
+    });
+  }
+  return _publicClient;
 }
 
 export interface PresignedUploadResult {
@@ -54,7 +83,7 @@ export async function getPresignedUploadUrl(
     ContentType: mimeType,
   });
 
-  const uploadUrl = await getSignedUrl(getS3Client(), command, {
+  const uploadUrl = await getSignedUrl(getPublicClient(), command, {
     expiresIn: 300,
   });
   const fileUrl = `${publicUrl}/${bucket}/${fileKey}`;

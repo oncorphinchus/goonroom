@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -21,6 +19,7 @@ export type Database = {
           id: string
           name: string
           position: number
+          server_id: string
           type: string
         }
         Insert: {
@@ -29,6 +28,7 @@ export type Database = {
           id?: string
           name: string
           position?: number
+          server_id: string
           type: string
         }
         Update: {
@@ -37,9 +37,69 @@ export type Database = {
           id?: string
           name?: string
           position?: number
+          server_id?: string
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "channels_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_posts: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          last_activity_at: string
+          locked: boolean
+          pinned: boolean
+          reply_count: number
+          title: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          last_activity_at?: string
+          locked?: boolean
+          pinned?: boolean
+          reply_count?: number
+          title: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          last_activity_at?: string
+          locked?: boolean
+          pinned?: boolean
+          reply_count?: number
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_posts_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_attachments: {
         Row: {
@@ -53,6 +113,7 @@ export type Database = {
           id: string
           message_id: string | null
           mime_type: string
+          post_id: string | null
           thumbnail_url: string | null
           user_id: string
         }
@@ -67,6 +128,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           mime_type: string
+          post_id?: string | null
           thumbnail_url?: string | null
           user_id: string
         }
@@ -81,6 +143,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           mime_type?: string
+          post_id?: string | null
           thumbnail_url?: string | null
           user_id?: string
         }
@@ -100,6 +163,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "media_attachments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "media_attachments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -114,6 +184,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          post_id: string | null
           user_id: string
         }
         Insert: {
@@ -121,6 +192,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          post_id?: string | null
           user_id: string
         }
         Update: {
@@ -128,6 +200,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          post_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -136,6 +209,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
             referencedColumns: ["id"]
           },
           {
@@ -168,12 +248,130 @@ export type Database = {
         }
         Relationships: []
       }
+      server_invites: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          server_id: string
+          uses: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          server_id: string
+          uses?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          server_id?: string
+          uses?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "server_invites_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      server_members: {
+        Row: {
+          joined_at: string
+          role: string
+          server_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          server_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          server_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_members_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "server_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servers: {
+        Row: {
+          created_at: string
+          icon_url: string | null
+          id: string
+          name: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon_url?: string | null
+          id?: string
+          name: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          icon_url?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servers_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_server_role: { Args: { target_server_id: string }; Returns: string }
+      increment_invite_uses: { Args: { p_invite_id: string }; Returns: undefined }
+      is_server_member: { Args: { target_server_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

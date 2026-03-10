@@ -44,6 +44,7 @@ Stack: Next.js (App Router), Tailwind CSS, shadcn/ui, Supabase, MinIO S3, Framer
 - Store the raw S3 `file_key` in the database alongside the full `file_url`.
 - Thumbnail generation happens client-side (canvas API) before the upload request.
 - Use `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` — no other S3 libraries.
+- **Docker Local Network Law:** The S3 client (`src/lib/s3.ts`) must use `MINIO_ENDPOINT` (internal Docker network, e.g. `http://minio:9000`) for all server-side operations. Browser-facing URLs (file_url, upload PUT targets) must use `MINIO_PUBLIC_URL` (Cloudflare Tunnel). These are two separate env vars and must never be confused.
 
 ---
 
@@ -60,7 +61,6 @@ Stack: Next.js (App Router), Tailwind CSS, shadcn/ui, Supabase, MinIO S3, Framer
 - `user-supabase`: MANDATORY for all DB schema changes (`apply_migration`) and verification (`list_tables`, `execute_sql`).
 - `user-brave-search` / `user-context7`: Use for any library version or best-practice lookups before writing boilerplate.
 - `user-puppeteer`: Use to self-test the running app before declaring a task complete.
-- `user-vercel`: Use to check deployment health and configure env vars after deploy.
 - `user-github`: Use to create branches and commit completed phases.
 
 ---
@@ -69,24 +69,36 @@ Stack: Next.js (App Router), Tailwind CSS, shadcn/ui, Supabase, MinIO S3, Framer
 ```
 src/
   app/
-    (auth)/         # Login / register pages
-    (app)/          # Authenticated shell (sidebar layout)
-      channels/[channelId]/
+    (auth)/                    # Login / register pages
+    (app)/                     # Authenticated shell
+      servers/[serverId]/
+        channels/[channelId]/
+          posts/[postId]/      # Forum thread view
+      join/[inviteCode]/       # Invite acceptance
+      create-server/           # Server creation
   components/
-    ui/             # shadcn primitives only
-    layout/         # Sidebar, Header, AppShell
-    chat/           # Chat-specific components
-    media/          # Media gallery components
+    ui/                        # shadcn primitives only
+    layout/                    # NavBar, ChannelSidebar
+    chat/                      # ChatArea, MessageList, MessageInput, MessageBubble
+    media/                     # MediaArea, MediaToolbar, MediaGrid, MediaCard, MediaTheater, UploadModal
+    forum/                     # ForumPostList, ForumPostCard, CreatePostModal, ThreadView, ThreadChat, ForumMediaTab
   features/
-    chat/           # Server actions, hooks, utils for chat
-    media/          # Server actions, hooks, utils for media
-    auth/           # Auth helpers
+    server/                    # Server CRUD actions
+    channel/                   # Channel CRUD actions
+    forum/                     # Forum post actions
+    chat/                      # sendMessage (supports postId), deleteMessage
+    media/                     # presignedUrl, insertMediaItem (supports postId), fetchMediaPage
+    auth/                      # Auth helpers
   lib/
-    supabase/       # client.ts + server.ts
-    s3.ts           # MinIO S3 client + presign helpers
-    utils.ts        # cn(), formatters
+    supabase/                  # client.ts + server.ts
+    s3.ts                      # MinIO S3 dual-client + presign helpers
+    utils.ts                   # cn(), formatters
   types/
-    database.ts     # Auto-generated Supabase types
+    database.ts                # Auto-generated Supabase types
+    server.ts                  # Server, ServerMember, ServerInvite
+    forum.ts                   # ForumPost, ForumPostWithProfile
+    chat.ts                    # MessageWithProfile, MessageGroup
+    media.ts                   # MediaItem, MediaSort, GridSize
 ```
 
 ---
@@ -98,6 +110,15 @@ src/
 
 ---
 
-## 10. SELF-TESTING LAW
+## 10. DOCKER / STANDALONE LAWS
+- `next.config.ts` must set `output: 'standalone'` — this is required for the Docker build.
+- Code must be compatible with Next.js standalone builds. Do not assume `node_modules` exists at runtime.
+- `sharp` must be installed as a production dependency for image optimization inside Docker.
+- Static assets (`public/`) and `.next/static` must be explicitly copied in the Dockerfile.
+- The app is containerized alongside MinIO on a shared Docker bridge network. Never hardcode hostnames — use env vars.
+
+---
+
+## 11. SELF-TESTING LAW
 - Before declaring ANY task complete, use `user-puppeteer` to screenshot and verify the running page.
 - If a lint error exists after an edit, fix it before moving on.

@@ -7,6 +7,7 @@ import { sendMessage } from "@/features/chat/actions";
 
 interface MessageInputProps {
   channelId: string;
+  postId?: string;
   channelName: string;
   onOptimisticSend: (content: string) => void;
   onOptimisticFail: (content: string) => void;
@@ -16,10 +17,11 @@ const MAX_HEIGHT_PX = 200;
 
 export function MessageInput({
   channelId,
+  postId,
   channelName,
   onOptimisticSend,
   onOptimisticFail,
-}: MessageInputProps) {
+}: MessageInputProps): React.ReactNode {
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function MessageInput({
 
     onOptimisticSend(trimmed);
 
-    const result = await sendMessage({ channelId, content: trimmed });
+    const result = await sendMessage({ channelId, postId, content: trimmed });
 
     if (result?.error) {
       onOptimisticFail(trimmed);
