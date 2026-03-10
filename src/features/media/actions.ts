@@ -8,13 +8,13 @@ import type { MediaItem } from "@/types/media";
 const presignSchema = z.object({
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1),
-  prefix: z.enum(["media", "thumbnails"]),
+  prefix: z.enum(["media", "thumbnails", "avatars"]),
 });
 
 export async function requestPresignedUrl(input: {
   fileName: string;
   mimeType: string;
-  prefix: "media" | "thumbnails";
+  prefix: "media" | "thumbnails" | "avatars";
 }): Promise<
   | { data: { uploadUrl: string; fileKey: string; fileUrl: string }; error?: undefined }
   | { data?: undefined; error: string }

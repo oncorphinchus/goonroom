@@ -96,7 +96,7 @@ export function MyAccountTab({ profile, email, onUsernameUpdated }: MyAccountTab
 
   async function handleDeleteAccount(): Promise<void> {
     setDeleteLoading(true);
-    const result = await deleteAccount({ confirmation: deleteConfirm as "DELETE" });
+    const result = await deleteAccount({ confirmation: deleteConfirm });
     setDeleteLoading(false);
     if (result.error) {
       toast.error(result.error);

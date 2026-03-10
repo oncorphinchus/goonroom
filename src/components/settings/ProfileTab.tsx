@@ -47,7 +47,7 @@ export function ProfileTab({ profile, onBioUpdated, onAvatarUpdated }: ProfileTa
     const presignResult = await requestPresignedUrl({
       fileName: file.name,
       mimeType: file.type,
-      prefix: "media",
+      prefix: "avatars",
     });
 
     if (presignResult.error || !presignResult.data) {

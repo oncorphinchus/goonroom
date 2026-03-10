@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database";
@@ -89,6 +90,11 @@ export async function fetchUserProfile(
   serverId?: string,
 ): Promise<{ data?: UserProfilePublic; error?: string }> {
   const supabase = await createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -150,6 +156,7 @@ export async function updateUsername(
     .eq("id", user.id);
 
   if (error) return { error: error.message };
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -215,13 +222,16 @@ export async function updateBio(
     .eq("id", user.id);
 
   if (error) return { error: error.message };
+  revalidatePath("/", "layout");
   return {};
 }
 
 // ─── Delete account ───────────────────────────────────────────────────────────
 
 const deleteAccountSchema = z.object({
-  confirmation: z.literal("DELETE"),
+  confirmation: z.string().refine((v) => v === "DELETE", {
+    message: 'Type "DELETE" to confirm.',
+  }),
 });
 
 export async function deleteAccount(

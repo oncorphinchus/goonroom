@@ -68,7 +68,7 @@ export interface PresignedUploadResult {
 export async function getPresignedUploadUrl(
   fileName: string,
   mimeType: string,
-  prefix: "media" | "thumbnails" = "media"
+  prefix: "media" | "thumbnails" | "avatars" = "media"
 ): Promise<PresignedUploadResult> {
   const bucket = process.env.MINIO_BUCKET ?? "goonroom";
   const publicUrl = requireEnv("MINIO_PUBLIC_URL");
