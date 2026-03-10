@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pin, X, ArrowRight } from "lucide-react";
+import { Pin, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sheet,
@@ -93,26 +93,24 @@ export function PinnedMessagesPanel({
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          dirty.current = true;
+          onClose();
+        }
+      }}
+    >
       <SheetContent
         side="right"
         className="flex w-80 flex-col border-l border-[#1e1f22] bg-[#2b2d31] p-0"
       >
-        <SheetHeader className="flex flex-row items-center justify-between border-b border-[#1e1f22] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Pin className="h-4 w-4 text-[#faa61a]" />
-            <SheetTitle className="text-sm font-semibold text-white">
-              Pinned Messages
-            </SheetTitle>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
-            aria-label="Close pinned messages"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        <SheetHeader className="flex flex-row items-center gap-2 border-b border-[#1e1f22] px-4 py-3">
+          <Pin className="h-4 w-4 shrink-0 text-[#faa61a]" />
+          <SheetTitle className="text-sm font-semibold text-white">
+            Pinned Messages
+          </SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">

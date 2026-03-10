@@ -86,7 +86,16 @@ export function UserProfileCard({ userId, serverId, children }: UserProfileCardP
         ) : loaded ? (
           <>
             {/* Banner */}
-            <div className="h-14 rounded-t-md bg-gradient-to-r from-[#5865f2] to-[#7289da]" />
+            <div
+              className="h-14 rounded-t-md bg-cover bg-center"
+              style={
+                loaded.profile.banner_url
+                  ? { backgroundImage: `url(${loaded.profile.banner_url})` }
+                  : loaded.profile.accent_color
+                    ? { background: loaded.profile.accent_color }
+                    : { background: "linear-gradient(to right, #5865f2, #7289da)" }
+              }
+            />
 
             {/* Avatar */}
             <div className="relative px-4">
@@ -110,6 +119,9 @@ export function UserProfileCard({ userId, serverId, children }: UserProfileCardP
             {/* Content */}
             <div className="px-4 pb-4 pt-10">
               <p className="text-base font-bold text-white">{loaded.profile.username}</p>
+              {loaded.profile.custom_status && (
+                <p className="mt-0.5 text-sm text-[#8e9297]">{loaded.profile.custom_status}</p>
+              )}
 
               {loaded.serverRole && (
                 <div className="mt-2">

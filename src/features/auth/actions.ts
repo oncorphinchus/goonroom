@@ -11,6 +11,7 @@ import type { Tables } from "@/types/database";
 export async function signIn(formData: {
   email: string;
   password: string;
+  redirectTo?: string;
 }): Promise<{ error: string } | undefined> {
   const supabase = await createClient();
 
@@ -21,7 +22,15 @@ export async function signIn(formData: {
 
   if (error) return { error: error.message };
 
-  redirect("/");
+  const redirectTo = formData.redirectTo?.trim();
+  const safeRedirect =
+    redirectTo &&
+    redirectTo.startsWith("/") &&
+    !redirectTo.startsWith("//") &&
+    !redirectTo.includes("\n")
+      ? redirectTo
+      : "/";
+  redirect(safeRedirect);
 }
 
 export async function signUp(formData: {
@@ -197,6 +206,37 @@ export async function updatePassword(
   return {};
 }
 
+// ─── Email ─────────────────────────────────────────────────────────────────────
+
+const updateEmailSchema = z.object({
+  newEmail: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required to change email"),
+});
+
+export async function updateEmail(
+  input: z.input<typeof updateEmailSchema>,
+): Promise<{ error?: string }> {
+  const parsed = updateEmailSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user || !user.email) return { error: "Not authenticated." };
+
+  const { error: reAuthErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: parsed.data.password,
+  });
+  if (reAuthErr) return { error: "Current password is incorrect." };
+
+  const { error } = await supabase.auth.updateUser({ email: parsed.data.newEmail });
+  if (error) return { error: error.message };
+  return {};
+}
+
 // ─── Bio ──────────────────────────────────────────────────────────────────────
 
 const updateBioSchema = z.object({
@@ -219,6 +259,67 @@ export async function updateBio(
   const { error } = await supabase
     .from("profiles")
     .update({ bio: parsed.data.bio || null })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return {};
+}
+
+// ─── Custom status ─────────────────────────────────────────────────────────────
+
+const updateCustomStatusSchema = z.object({
+  customStatus: z.string().max(128, "Status must be at most 128 characters"),
+});
+
+export async function updateCustomStatus(
+  input: z.input<typeof updateCustomStatusSchema>,
+): Promise<{ error?: string }> {
+  const parsed = updateCustomStatusSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ custom_status: parsed.data.customStatus || null })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return {};
+}
+
+// ─── Accent color ─────────────────────────────────────────────────────────────
+
+const updateAccentColorSchema = z.object({
+  accentColor: z.union([
+    z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color"),
+    z.literal(""),
+  ]),
+});
+
+export async function updateAccentColor(
+  input: z.input<typeof updateAccentColorSchema>,
+): Promise<{ error?: string }> {
+  const parsed = updateAccentColorSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ accent_color: parsed.data.accentColor || null })
     .eq("id", user.id);
 
   if (error) return { error: error.message };

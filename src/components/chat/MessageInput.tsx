@@ -13,8 +13,8 @@ interface MessageInputProps {
   channelName: string;
   replyingTo?: ReplySnippet | null;
   onCancelReply?: () => void;
-  onOptimisticSend: (content: string) => void;
-  onOptimisticFail: (content: string) => void;
+  onOptimisticSend: (content: string) => string;
+  onOptimisticFail: (tempId: string) => void;
   onUploadClick?: () => void;
 }
 
@@ -62,7 +62,7 @@ export function MessageInput({
     resetTextareaHeight();
     textareaRef.current?.focus();
 
-    onOptimisticSend(trimmed);
+    const tempId = onOptimisticSend(trimmed);
 
     const result = await sendMessage({
       channelId,
@@ -71,8 +71,8 @@ export function MessageInput({
       content: trimmed,
     });
 
-    if (result?.error) {
-      onOptimisticFail(trimmed);
+    if (result.error) {
+      onOptimisticFail(tempId);
       toast.error(result.error);
       setContent(trimmed);
       if (textareaRef.current) {

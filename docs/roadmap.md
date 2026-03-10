@@ -155,16 +155,16 @@ Below are grouped phases covering every major Discord feature not yet in GoonRoo
 
 - [x] 12.1 **User settings page** — `/settings` route (or modal) with sidebar tabs: My Account, Profile, Appearance, Privacy
 - [x] 12.2 **Change username** — `updateUsername` server action, username uniqueness check, zod validation (3–32 chars, alphanumeric + underscores), update `profiles.username`
-- [ ] 12.3 **Change email** — `updateEmail` server action, Supabase `updateUser({ email })`, email confirmation flow, show pending email in settings
+- [x] 12.3 **Change email** — `updateEmail` server action, Supabase `updateUser({ email })`, email confirmation flow, show pending email in settings
 - [x] 12.4 **Change password** — `updatePassword` server action, Supabase `updateUser({ password })`, require current password confirmation, minimum 8 chars
 - [x] 12.5 **User bio / "About Me"** — `bio` column on `profiles` (text, max 190 chars), editable in settings, displayed on profile card/popover
-- [ ] 12.6 **Custom status** — `custom_status` column on `profiles` (text, max 128 chars), emoji + text, shown next to username in sidebar and message bubbles
-- [ ] 12.7 **Profile banner image** — `banner_url` column on `profiles`, upload via presigned URL (like avatar), displayed on profile card header
+- [x] 12.6 **Custom status** — `custom_status` column on `profiles` (text, max 128 chars), emoji + text, shown next to username in sidebar and message bubbles
+- [x] 12.7 **Profile banner image** — `banner_url` column on `profiles`, upload via presigned URL (like avatar), displayed on profile card header
 - [x] 12.8 **User profile card / popover** — click username anywhere to open popover: avatar, banner, username, bio, custom status, roles in current server, member since date, "Message" button (future DM)
 - [x] 12.9 **Account info display** — settings page shows: email, username, user ID, account creation date, linked auth providers
 - [x] 12.10 **Delete account** — `deleteAccount` server action, confirmation modal ("type DELETE to confirm"), delete from `auth.users` (cascade clears profile, memberships), sign out, redirect to login
-- [ ] 12.11 **Avatar crop/resize** — before upload, show crop UI (circular mask), resize to 256×256 max, preview before confirming
-- [ ] 12.12 **Profile accent color** — `accent_color` column on `profiles` (hex string), color picker in settings, used as profile card accent bar
+- [x] 12.11 **Avatar crop/resize** — before upload, show crop UI (circular mask), resize to 256×256 max, preview before confirming
+- [x] 12.12 **Profile accent color** — `accent_color` column on `profiles` (hex string), color picker in settings, used as profile card accent bar
 
 ---
 
@@ -174,13 +174,13 @@ Below are grouped phases covering every major Discord feature not yet in GoonRoo
 - [x] 13.2 **Set server nickname** — edit in server member dropdown or member list right-click, displayed in place of global username within that server
 - [x] 13.3 **Server avatar per user** — upload per-server avatar, stored via presigned URL, shown in messages within that server
 - [x] 13.4 **Server icon upload** — update `servers.icon_url` via presigned upload + `updateServer` action, crop/resize before upload, displayed in NavBar + server header
-- [ ] 13.5 **Server banner** — `banner_url` column on `servers`, displayed at top of channel sidebar, configurable by owner/admin
-- [ ] 13.6 **Server description** — `description` column on `servers`, shown in server settings and invite preview
+- [x] 13.5 **Server banner** — `banner_url` column on `servers`, displayed at top of channel sidebar, configurable by owner/admin
+- [x] 13.6 **Server description** — `description` column on `servers`, shown in server settings and invite preview
 - [x] 13.7 **Server settings overhaul** — tabbed settings page/modal: Overview, Roles, Channels, Invites, Members, Danger Zone
 - [x] 13.8 **Channel categories** — `channel_categories` table (`id`, `server_id`, `name`, `position`), `category_id` FK on `channels`, collapsible groups in sidebar
 - [x] 13.9 **Channel reordering** — drag-and-drop to reorder channels within categories, update `position` via server action
-- [ ] 13.10 **Channel description & topic** — editable topic shown below channel name in header bar, "Edit Channel" modal for name/description/topic
-- [ ] 13.11 **NSFW channel flag** — `nsfw` boolean on `channels`, age-gate modal before entering, NSFW badge in sidebar
+- [x] 13.10 **Channel description & topic** — editable topic shown below channel name in header bar, "Edit Channel" modal for name/description/topic
+- [x] 13.11 **NSFW channel flag** — `nsfw` boolean on `channels`, age-gate modal before entering, NSFW badge in sidebar
 
 ---
 

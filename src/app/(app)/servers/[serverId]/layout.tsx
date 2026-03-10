@@ -61,6 +61,8 @@ export default async function ServerLayout({
       serverId={serverId}
       serverName={currentServer.name}
       serverIconUrl={currentServer.icon_url ?? null}
+      serverBannerUrl={currentServer.banner_url ?? null}
+      serverDescription={currentServer.description ?? null}
       channels={channelsResult.data ?? []}
       categories={categoriesResult.data ?? []}
       profile={profileResult.data}

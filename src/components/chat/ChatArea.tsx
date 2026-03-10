@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Pin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Hash, Pencil, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { UploadModal } from "@/components/media/UploadModal";
 import { PinnedMessagesPanel } from "./PinnedMessagesPanel";
+import { EditChannelModal } from "@/components/layout/EditChannelModal";
 import {
   deleteMessage,
   editMessage,
@@ -32,7 +34,7 @@ interface ChatAreaProps {
 
 type ProfileSnippet = Pick<
   Tables<"profiles">,
-  "id" | "username" | "avatar_url"
+  "id" | "username" | "avatar_url" | "custom_status"
 >;
 
 export function ChatArea({
@@ -43,11 +45,16 @@ export function ChatArea({
   serverId,
   serverProfiles,
 }: ChatAreaProps): React.ReactNode {
+  const router = useRouter();
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ReplySnippet | null>(null);
   const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false);
+  const [editChannelOpen, setEditChannelOpen] = useState(false);
+  const [pinnedCount, setPinnedCount] = useState(
+    () => initialMessages.filter((m) => m.pinned && !m._pending).length,
+  );
   const scrollToMessageRef = useRef<((messageId: string) => void) | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
@@ -78,7 +85,7 @@ export function ChatArea({
       const promise = (async (): Promise<ProfileSnippet | null> => {
         const { data } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url")
+          .select("id, username, avatar_url, custom_status")
           .eq("id", userId)
           .single();
 
@@ -94,7 +101,7 @@ export function ChatArea({
   );
 
   const addOptimisticMessage = useCallback(
-    (content: string) => {
+    (content: string): string => {
       const tempId = crypto.randomUUID();
 
       const pending: MessageWithProfile = {
@@ -114,13 +121,14 @@ export function ChatArea({
       };
 
       setMessages((prev) => [...prev, pending]);
+      return tempId;
     },
     [channel.id, currentUserId, replyingTo],
   );
 
-  const removeOptimisticMessage = useCallback((content: string) => {
+  const removeOptimisticMessage = useCallback((tempId: string) => {
     setMessages((prev) => {
-      const idx = prev.findIndex((m) => m._pending && m.content === content);
+      const idx = prev.findIndex((m) => m._pending && m.id === tempId);
       if (idx === -1) return prev;
       const next = [...prev];
       next.splice(idx, 1);
@@ -138,10 +146,10 @@ export function ChatArea({
 
       const result = await deleteMessage({ messageId });
 
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
       }
-      if (result?.error && removed) {
+      if (result.error && removed) {
         const rollback = removed;
         setMessages((prev) => {
           if (prev.some((m) => m.id === messageId)) return prev;
@@ -169,7 +177,7 @@ export function ChatArea({
       );
 
       const result = await editMessage({ messageId, content });
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
       }
     },
@@ -219,7 +227,7 @@ export function ChatArea({
       );
 
       const result = await addReaction({ messageId, emoji });
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
       }
     },
@@ -249,7 +257,7 @@ export function ChatArea({
       );
 
       const result = await removeReaction({ messageId, emoji });
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
       }
     },
@@ -268,7 +276,7 @@ export function ChatArea({
         ? await unpinMessage({ messageId })
         : await pinMessage({ messageId });
 
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
         setMessages((prev) =>
           prev.map((m) =>
@@ -279,6 +287,19 @@ export function ChatArea({
     },
     [],
   );
+
+  // Fetch the true pinned count from the DB (not limited to the 50-message window)
+  useEffect(() => {
+    supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("channel_id", channel.id)
+      .eq("pinned", true)
+      .is("post_id", null)
+      .then(({ count }) => {
+        if (count !== null) setPinnedCount(count);
+      });
+  }, [channel.id, supabase]);
 
   useEffect(() => {
     const subscription = supabase
@@ -337,9 +358,40 @@ export function ChatArea({
                 profiles: profile,
                 _replyTo: replyTo,
                 _reactions: [],
+                _media: [],
               },
             ];
           });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "media_attachments",
+          filter: `channel_id=eq.${channel.id}`,
+        },
+        async (payload) => {
+          const raw = payload.new as Tables<"media_attachments"> & { message_id?: string };
+          const msgId = raw.message_id;
+          if (!msgId) return;
+          const { data: mediaRow } = await supabase
+            .from("media_attachments")
+            .select("*, profiles(id, username, avatar_url)")
+            .eq("id", raw.id)
+            .single();
+          if (!mediaRow) return;
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== msgId) return m;
+              const media = [...(m._media ?? [])];
+              if (!media.some((x) => x.id === raw.id)) {
+                media.push(mediaRow as import("@/types/media").MediaItem);
+              }
+              return { ...m, _media: media };
+            }),
+          );
         },
       )
       .on(
@@ -352,6 +404,7 @@ export function ChatArea({
         },
         (payload) => {
           const updated = payload.new as Tables<"messages">;
+          const old = payload.old as Partial<Tables<"messages">>;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === updated.id
@@ -364,6 +417,10 @@ export function ChatArea({
                 : m,
             ),
           );
+          // Keep pinned count in sync when pin status changes
+          if (old.pinned !== undefined && old.pinned !== updated.pinned) {
+            setPinnedCount((prev) => prev + (updated.pinned ? 1 : -1));
+          }
         },
       )
       .on(
@@ -461,10 +518,6 @@ export function ChatArea({
     };
   }, [channel.id, supabase, currentUserId, fetchProfile]);
 
-  const pinnedCount = messages.filter(
-    (m) => m.pinned && !m._pending,
-  ).length;
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="flex h-12 shrink-0 items-center border-b border-[#1e1f22] bg-[#313338] px-4 shadow-sm">
@@ -479,6 +532,16 @@ export function ChatArea({
           </>
         )}
         <div className="ml-auto flex items-center gap-1">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setEditChannelOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
+              aria-label="Edit channel"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setPinnedPanelOpen(true)}
@@ -525,6 +588,7 @@ export function ChatArea({
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         channelId={channel.id}
+        embedInChat
         onFileQueued={() => {}}
         onFileComplete={() => {}}
         onFileFailed={() => {}}
@@ -539,6 +603,13 @@ export function ChatArea({
         onScrollToMessage={(messageId) =>
           scrollToMessageRef.current?.(messageId)
         }
+      />
+
+      <EditChannelModal
+        open={editChannelOpen}
+        onOpenChange={setEditChannelOpen}
+        channel={channel}
+        onSaved={() => router.refresh()}
       />
     </div>
   );

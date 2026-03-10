@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Hash } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import type { MessageWithProfile, MessageGroup } from "@/types/chat";
@@ -35,6 +35,7 @@ function groupMessages(
         userId: message.user_id,
         username: sp?.nickname ?? message.profiles?.username ?? "Unknown",
         avatarUrl: sp?.serverAvatarUrl ?? message.profiles?.avatar_url ?? null,
+        customStatus: message.profiles?.custom_status ?? null,
         timestamp: message.created_at,
         messages: [message],
       });
@@ -127,19 +128,18 @@ export function MessageList({
     isFirstRender.current = false;
   }, [messages]);
 
-  const scrollToMessage = (messageId: string): void => {
+  const scrollToMessage = useCallback((messageId: string): void => {
     const el = document.getElementById(`msg-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.classList.add("bg-[#5865f2]/10");
       setTimeout(() => el.classList.remove("bg-[#5865f2]/10"), 2000);
     }
-  };
+  }, []);
 
   useEffect(() => {
     onScrollToMessageRef?.(scrollToMessage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onScrollToMessageRef]);
+  }, [onScrollToMessageRef, scrollToMessage]);
 
   const groups = groupMessages(messages, serverProfiles);
 

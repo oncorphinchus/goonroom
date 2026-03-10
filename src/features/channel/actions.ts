@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database";
 
@@ -9,6 +10,7 @@ const createChannelSchema = z.object({
   name: z.string().min(1).max(100),
   type: z.enum(["TEXT", "FORUM"]),
   description: z.string().max(500).nullable().optional(),
+  nsfw: z.boolean().optional(),
 });
 
 export async function createChannel(
@@ -42,6 +44,7 @@ export async function createChannel(
       type: parsed.data.type,
       description: parsed.data.description ?? null,
       position: nextPosition,
+      nsfw: parsed.data.nsfw ?? false,
     })
     .select()
     .single();
@@ -55,6 +58,7 @@ const updateChannelSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
+  nsfw: z.boolean().optional(),
 });
 
 export async function updateChannel(
@@ -77,10 +81,11 @@ export async function updateChannel(
   const { data: role } = await supabase.rpc("get_server_role", { target_server_id: ch.server_id });
   if (role !== "owner" && role !== "admin") return { error: "You must be an admin to edit channels." };
 
-  const updates: Record<string, unknown> = {};
+  const updates: import("@/types/database").TablesUpdate<"channels"> = {};
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.description !== undefined) updates.description = parsed.data.description;
   if (parsed.data.categoryId !== undefined) updates.category_id = parsed.data.categoryId;
+  if (parsed.data.nsfw !== undefined) updates.nsfw = parsed.data.nsfw;
 
   if (Object.keys(updates).length === 0) return {};
 
@@ -90,6 +95,8 @@ export async function updateChannel(
     .eq("id", parsed.data.channelId);
 
   if (error) return { error: error.message };
+
+  revalidatePath(`/servers/${ch.server_id}/channels/${parsed.data.channelId}`);
   return {};
 }
 
@@ -115,21 +122,32 @@ export async function reorderChannels(
 
   if (parsed.data.order.length === 0) return {};
 
-  const { data: ch } = await supabase
+  const allIds = parsed.data.order.map((c) => c.id);
+  const { data: channelRows } = await supabase
     .from("channels")
-    .select("server_id")
-    .eq("id", parsed.data.order[0].id)
-    .single();
-  if (!ch) return { error: "Channel not found." };
+    .select("id, server_id")
+    .in("id", allIds);
 
-  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: ch.server_id });
+  if (!channelRows || channelRows.length !== allIds.length) {
+    return { error: "One or more channels not found." };
+  }
+
+  const serverIds = new Set(channelRows.map((c) => c.server_id));
+  if (serverIds.size !== 1) {
+    return { error: "All channels must belong to the same server." };
+  }
+
+  const serverId = [...serverIds][0];
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: serverId });
   if (role !== "owner" && role !== "admin") return { error: "Only admins can reorder channels." };
 
-  for (const { id, position, categoryId } of parsed.data.order) {
-    const update: Record<string, unknown> = { position };
-    if (categoryId !== undefined) update.category_id = categoryId;
-    await supabase.from("channels").update(update).eq("id", id);
-  }
+  await Promise.all(
+    parsed.data.order.map(({ id, position, categoryId }) => {
+      const update: { position: number; category_id?: string | null } = { position };
+      if (categoryId !== undefined) update.category_id = categoryId;
+      return supabase.from("channels").update(update).eq("id", id);
+    }),
+  );
 
   return {};
 }
@@ -140,7 +158,7 @@ const deleteChannelSchema = z.object({
 
 export async function deleteChannel(
   input: z.input<typeof deleteChannelSchema>,
-): Promise<{ error: string } | undefined> {
+): Promise<{ error?: string }> {
   const parsed = deleteChannelSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -165,4 +183,5 @@ export async function deleteChannel(
     .eq("id", parsed.data.channelId);
 
   if (error) return { error: error.message };
+  return {};
 }

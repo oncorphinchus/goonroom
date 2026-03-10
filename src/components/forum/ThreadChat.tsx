@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
+import { UploadModal } from "@/components/media/UploadModal";
 import {
   deleteMessage,
   editMessage,
@@ -20,7 +21,7 @@ import type { MessageWithProfile, ReplySnippet } from "@/types/chat";
 
 type ProfileSnippet = Pick<
   Tables<"profiles">,
-  "id" | "username" | "avatar_url"
+  "id" | "username" | "avatar_url" | "custom_status"
 >;
 
 interface ThreadChatProps {
@@ -44,6 +45,7 @@ export function ThreadChat({
     useState<MessageWithProfile[]>(initialMessages);
   const [replyingTo, setReplyingTo] = useState<ReplySnippet | null>(null);
   const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const scrollToMessageRef = useRef<((messageId: string) => void) | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
@@ -72,7 +74,7 @@ export function ThreadChat({
       const promise = (async (): Promise<ProfileSnippet | null> => {
         const { data } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url")
+          .select("id, username, avatar_url, custom_status")
           .eq("id", userId)
           .single();
 
@@ -88,9 +90,10 @@ export function ThreadChat({
   );
 
   const addOptimisticMessage = useCallback(
-    (content: string) => {
+    (content: string): string => {
+      const tempId = crypto.randomUUID();
       const pending: MessageWithProfile = {
-        id: crypto.randomUUID(),
+        id: tempId,
         channel_id: channel.id,
         post_id: post.id,
         user_id: currentUserId,
@@ -105,13 +108,14 @@ export function ThreadChat({
         _reactions: [],
       };
       setMessages((prev) => [...prev, pending]);
+      return tempId;
     },
     [channel.id, post.id, currentUserId, replyingTo],
   );
 
-  const removeOptimisticMessage = useCallback((content: string) => {
+  const removeOptimisticMessage = useCallback((tempId: string) => {
     setMessages((prev) => {
-      const idx = prev.findIndex((m) => m._pending && m.content === content);
+      const idx = prev.findIndex((m) => m._pending && m.id === tempId);
       if (idx === -1) return prev;
       const next = [...prev];
       next.splice(idx, 1);
@@ -127,10 +131,10 @@ export function ThreadChat({
     });
 
     const result = await deleteMessage({ messageId });
-    if (result?.error) {
+    if (result.error) {
       toast.error(result.error);
     }
-    if (result?.error && removed) {
+    if (result.error && removed) {
       const rollback = removed;
       setMessages((prev) => {
         if (prev.some((m) => m.id === messageId)) return prev;
@@ -155,7 +159,7 @@ export function ThreadChat({
         ),
       );
       const result = await editMessage({ messageId, content });
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
       }
     },
@@ -200,7 +204,7 @@ export function ThreadChat({
         }),
       );
       const result = await addReaction({ messageId, emoji });
-      if (result?.error) toast.error(result.error);
+      if (result.error) toast.error(result.error);
     },
     [currentUserId],
   );
@@ -223,7 +227,7 @@ export function ThreadChat({
         }),
       );
       const result = await removeReaction({ messageId, emoji });
-      if (result?.error) toast.error(result.error);
+      if (result.error) toast.error(result.error);
     },
     [currentUserId],
   );
@@ -240,7 +244,7 @@ export function ThreadChat({
         ? await unpinMessage({ messageId })
         : await pinMessage({ messageId });
 
-      if (result?.error) {
+      if (result.error) {
         toast.error(result.error);
         setMessages((prev) =>
           prev.map((m) =>
@@ -303,9 +307,45 @@ export function ThreadChat({
             if (prev.some((m) => m.id === raw.id)) return prev;
             return [
               ...prev,
-              { ...raw, profiles: profile, _replyTo: replyTo, _reactions: [] },
+              {
+                ...raw,
+                profiles: profile,
+                _replyTo: replyTo,
+                _reactions: [],
+                _media: [],
+              },
             ];
           });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "media_attachments",
+          filter: `post_id=eq.${post.id}`,
+        },
+        async (payload) => {
+          const raw = payload.new as Tables<"media_attachments"> & { message_id?: string };
+          const msgId = raw.message_id;
+          if (!msgId) return;
+          const { data: mediaRow } = await supabase
+            .from("media_attachments")
+            .select("*, profiles(id, username, avatar_url)")
+            .eq("id", raw.id)
+            .single();
+          if (!mediaRow) return;
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== msgId) return m;
+              const media = [...(m._media ?? [])];
+              if (!media.some((x) => x.id === raw.id)) {
+                media.push(mediaRow as import("@/types/media").MediaItem);
+              }
+              return { ...m, _media: media };
+            }),
+          );
         },
       )
       .on(
@@ -453,15 +493,28 @@ export function ThreadChat({
           </div>
         </div>
       ) : (
-        <MessageInput
-          channelId={channel.id}
-          postId={post.id}
-          channelName={post.title}
-          replyingTo={replyingTo}
-          onCancelReply={handleCancelReply}
-          onOptimisticSend={addOptimisticMessage}
-          onOptimisticFail={removeOptimisticMessage}
-        />
+        <>
+          <MessageInput
+            channelId={channel.id}
+            postId={post.id}
+            channelName={post.title}
+            replyingTo={replyingTo}
+            onCancelReply={handleCancelReply}
+            onOptimisticSend={addOptimisticMessage}
+            onOptimisticFail={removeOptimisticMessage}
+            onUploadClick={() => setUploadOpen(true)}
+          />
+          <UploadModal
+            open={uploadOpen}
+            onOpenChange={setUploadOpen}
+            channelId={channel.id}
+            postId={post.id}
+            embedInChat
+            onFileQueued={() => {}}
+            onFileComplete={() => {}}
+            onFileFailed={() => {}}
+          />
+        </>
       )}
 
       <PinnedMessagesPanel

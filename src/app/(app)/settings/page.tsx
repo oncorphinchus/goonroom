@@ -21,5 +21,12 @@ export default async function SettingsPage(): Promise<React.ReactNode> {
 
   if (error || !profile) redirect("/");
 
-  return <SettingsShell profile={profile} email={user.email ?? ""} />;
+  const newEmail = (user as { new_email?: string | null }).new_email ?? null;
+  return (
+    <SettingsShell
+      profile={profile}
+      email={user.email ?? ""}
+      newEmail={newEmail}
+    />
+  );
 }

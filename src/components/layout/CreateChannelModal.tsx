@@ -31,6 +31,7 @@ export function CreateChannelModal({
   const [name, setName] = useState("");
   const [type, setType] = useState<ChannelType>("TEXT");
   const [description, setDescription] = useState("");
+  const [nsfw, setNsfw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export function CreateChannelModal({
     setName("");
     setType("TEXT");
     setDescription("");
+    setNsfw(false);
     setError(null);
   }
 
@@ -51,6 +53,7 @@ export function CreateChannelModal({
       name: name.trim().toLowerCase().replace(/\s+/g, "-"),
       type,
       description: description.trim() || null,
+      nsfw,
     });
 
     if (result.error) {
@@ -158,6 +161,16 @@ export function CreateChannelModal({
               className="w-full rounded-md bg-[#1e1f22] px-3 py-2 text-sm text-white placeholder-[#4f545c] outline-none"
             />
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={nsfw}
+              onChange={(e) => setNsfw(e.target.checked)}
+              className="h-4 w-4 rounded border-[#4f545c] bg-[#1e1f22] accent-[#5865f2]"
+            />
+            <span className="text-sm text-[#dcddde]">NSFW channel (age-restricted)</span>
+          </label>
 
           {error && (
             <p className="rounded bg-[#ed4245]/10 px-3 py-2 text-sm text-[#ed4245]">

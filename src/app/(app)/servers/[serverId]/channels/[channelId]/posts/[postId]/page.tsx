@@ -37,17 +37,17 @@ export default async function PostPage({ params }: PostPageProps): Promise<React
 
   const { data: post } = await supabase
     .from("forum_posts")
-    .select("*, profiles(id, username, avatar_url)")
+    .select("*, profiles(id, username, avatar_url, custom_status)")
     .eq("id", postId)
     .eq("channel_id", channelId)
     .single();
 
   if (!post) notFound();
 
-  const [messagesResult, mediaResult] = await Promise.all([
+  const [messagesResult, mediaResult, messageMediaResult] = await Promise.all([
     supabase
       .from("messages")
-      .select("*, profiles(id, username, avatar_url)")
+      .select("*, profiles(id, username, avatar_url, custom_status)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true })
       .limit(50),
@@ -57,7 +57,28 @@ export default async function PostPage({ params }: PostPageProps): Promise<React
       .eq("post_id", postId)
       .order("created_at", { ascending: false })
       .limit(40),
+    supabase
+      .from("media_attachments")
+      .select("*, profiles(id, username, avatar_url)")
+      .eq("post_id", postId)
+      .not("message_id", "is", null),
   ]);
+
+  const msgs = (messagesResult.data ?? []) as MessageWithProfile[];
+  const messageMedia = (messageMediaResult.data ?? []) as MediaItem[];
+  const mediaMap = new Map<string, MediaItem[]>();
+  for (const m of messageMedia) {
+    const msgId = m.message_id as string | null;
+    if (msgId) {
+      const list = mediaMap.get(msgId) ?? [];
+      list.push(m);
+      mediaMap.set(msgId, list);
+    }
+  }
+  const enrichedMessages: MessageWithProfile[] = msgs.map((m) => ({
+    ...m,
+    _media: mediaMap.get(m.id) ?? [],
+  }));
 
   return (
     <ThreadView
@@ -65,7 +86,7 @@ export default async function PostPage({ params }: PostPageProps): Promise<React
       channel={channel}
       post={post as ForumPostWithProfile}
       serverId={serverId}
-      initialMessages={(messagesResult.data ?? []) as MessageWithProfile[]}
+      initialMessages={enrichedMessages}
       initialMedia={(mediaResult.data ?? []) as MediaItem[]}
       initialMediaTotal={mediaResult.count ?? 0}
       currentUserId={user.id}

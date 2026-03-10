@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ForumPostList } from "@/components/forum/ForumPostList";
+import { ChannelPageContent } from "@/components/layout/ChannelPageContent";
 import type { MessageWithProfile, ReactionGroup } from "@/types/chat";
 
 interface ChannelPageProps {
@@ -36,17 +37,20 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
 
   if (channel.type === "FORUM") {
     return (
-      <ForumPostList
-        key={channelId}
-        channel={channel}
-        serverId={serverId}
-      />
+      <ChannelPageContent channel={channel}>
+        <ForumPostList
+          key={channelId}
+          channel={channel}
+          serverId={serverId}
+          isAdmin={isAdmin}
+        />
+      </ChannelPageContent>
     );
   }
 
   const { data: rawMessages } = await supabase
     .from("messages")
-    .select("*, profiles(id, username, avatar_url)")
+    .select("*, profiles(id, username, avatar_url, custom_status)")
     .eq("channel_id", channelId)
     .is("post_id", null)
     .order("created_at", { ascending: true })
@@ -78,6 +82,24 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
   }
 
   const msgIds = msgs.map((m) => m.id);
+  const mediaMap = new Map<string, import("@/types/media").MediaItem[]>();
+  if (msgIds.length > 0) {
+    const { data: mediaRows } = await supabase
+      .from("media_attachments")
+      .select("*, profiles(id, username, avatar_url)")
+      .in("message_id", msgIds)
+      .not("message_id", "is", null);
+    if (mediaRows) {
+      for (const row of mediaRows) {
+        const msgId = row.message_id as string;
+        if (!msgId) continue;
+        const list = mediaMap.get(msgId) ?? [];
+        list.push(row as import("@/types/media").MediaItem);
+        mediaMap.set(msgId, list);
+      }
+    }
+  }
+
   const reactionsMap = new Map<string, ReactionGroup[]>();
   if (msgIds.length > 0) {
     const { data: reactionRows } = await supabase
@@ -108,6 +130,7 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
     ...m,
     _replyTo: m.reply_to_id ? replyMap.get(m.reply_to_id) ?? null : null,
     _reactions: reactionsMap.get(m.id) ?? [],
+    _media: mediaMap.get(m.id) ?? [],
   }));
 
   const { data: serverProfileRows } = await supabase
@@ -124,14 +147,16 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
   }
 
   return (
-    <ChatArea
-      key={channelId}
-      channel={channel}
-      initialMessages={enrichedMessages}
-      currentUserId={user.id}
-      isAdmin={isAdmin}
-      serverId={serverId}
-      serverProfiles={serverProfilesMap}
-    />
+    <ChannelPageContent channel={channel}>
+      <ChatArea
+        key={channelId}
+        channel={channel}
+        initialMessages={enrichedMessages}
+        currentUserId={user.id}
+        isAdmin={isAdmin}
+        serverId={serverId}
+        serverProfiles={serverProfilesMap}
+      />
+    </ChannelPageContent>
   );
 }

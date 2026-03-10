@@ -1,4 +1,5 @@
 import type { Tables } from "@/types/database";
+import type { MediaItem } from "@/types/media";
 
 export type ReactionGroup = {
   emoji: string;
@@ -13,10 +14,11 @@ export type ReplySnippet = {
 };
 
 export type MessageWithProfile = Tables<"messages"> & {
-  profiles: Pick<Tables<"profiles">, "id" | "username" | "avatar_url"> | null;
+  profiles: Pick<Tables<"profiles">, "id" | "username" | "avatar_url" | "custom_status"> | null;
   _pending?: boolean;
   _replyTo?: ReplySnippet | null;
   _reactions?: ReactionGroup[];
+  _media?: MediaItem[];
 };
 
 export interface MessageGroup {
@@ -24,6 +26,7 @@ export interface MessageGroup {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  customStatus: string | null;
   timestamp: string;
   messages: MessageWithProfile[];
 }

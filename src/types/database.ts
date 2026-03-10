@@ -51,6 +51,7 @@ export interface Database {
           created_at: string;
           server_id: string;
           category_id: string | null;
+          nsfw: boolean;
         };
         Insert: {
           id?: string;
@@ -61,12 +62,14 @@ export interface Database {
           created_at?: string;
           server_id: string;
           category_id?: string | null;
+          nsfw?: boolean;
         };
         Update: {
           id?: string;
           name?: string;
           type?: string;
           description?: string | null;
+          nsfw?: boolean;
           position?: number;
           created_at?: string;
           server_id?: string;
@@ -310,6 +313,9 @@ export interface Database {
           avatar_url: string | null;
           bio: string | null;
           created_at: string;
+          custom_status: string | null;
+          banner_url: string | null;
+          accent_color: string | null;
         };
         Insert: {
           id: string;
@@ -317,6 +323,9 @@ export interface Database {
           avatar_url?: string | null;
           bio?: string | null;
           created_at?: string;
+          custom_status?: string | null;
+          banner_url?: string | null;
+          accent_color?: string | null;
         };
         Update: {
           id?: string;
@@ -324,6 +333,9 @@ export interface Database {
           avatar_url?: string | null;
           bio?: string | null;
           created_at?: string;
+          custom_status?: string | null;
+          banner_url?: string | null;
+          accent_color?: string | null;
         };
         Relationships: [];
       };

@@ -13,6 +13,7 @@ type SettingsTab = "account" | "profile";
 interface SettingsShellProps {
   profile: Tables<"profiles">;
   email: string;
+  newEmail?: string | null;
 }
 
 const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
@@ -20,7 +21,7 @@ const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "profile", label: "Profile", icon: <Shield className="h-4 w-4" /> },
 ];
 
-export function SettingsShell({ profile, email }: SettingsShellProps): React.ReactNode {
+export function SettingsShell({ profile, email, newEmail }: SettingsShellProps): React.ReactNode {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const [currentProfile, setCurrentProfile] = useState(profile);
@@ -71,6 +72,7 @@ export function SettingsShell({ profile, email }: SettingsShellProps): React.Rea
             <MyAccountTab
               profile={currentProfile}
               email={email}
+              newEmail={newEmail}
               onUsernameUpdated={(username) =>
                 setCurrentProfile((p) => ({ ...p, username }))
               }
@@ -82,6 +84,15 @@ export function SettingsShell({ profile, email }: SettingsShellProps): React.Rea
               onBioUpdated={(bio) => setCurrentProfile((p) => ({ ...p, bio }))}
               onAvatarUpdated={(avatar_url) =>
                 setCurrentProfile((p) => ({ ...p, avatar_url }))
+              }
+              onCustomStatusUpdated={(custom_status) =>
+                setCurrentProfile((p) => ({ ...p, custom_status }))
+              }
+              onBannerUpdated={(banner_url) =>
+                setCurrentProfile((p) => ({ ...p, banner_url }))
+              }
+              onAccentColorUpdated={(accent_color) =>
+                setCurrentProfile((p) => ({ ...p, accent_color }))
               }
             />
           )}

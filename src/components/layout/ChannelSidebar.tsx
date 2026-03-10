@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { GripVertical, Hash, MessageSquareText, ChevronDown, ChevronRight, LogOut, Settings, Plus, Copy, UserCog } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -41,6 +42,8 @@ interface ChannelSidebarProps {
   serverId: string;
   serverName: string;
   serverIconUrl?: string | null;
+  serverBannerUrl?: string | null;
+  serverDescription?: string | null;
   channels: Tables<"channels">[];
   categories: Tables<"channel_categories">[];
   profile: Tables<"profiles">;
@@ -96,6 +99,11 @@ function SortableChannelItem({ channel, active, serverId }: ChannelItemProps): R
           )}
         />
         <span className="truncate">{channel.name}</span>
+        {channel.nsfw && (
+          <span className="shrink-0 rounded bg-[#ed4245]/20 px-1 py-0.5 text-[10px] font-medium text-[#ed4245]">
+            NSFW
+          </span>
+        )}
       </button>
     </div>
   );
@@ -116,6 +124,11 @@ function ChannelItem({ channel, active, serverId }: ChannelItemProps): React.Rea
     >
       <Icon className={cn("h-4 w-4 shrink-0", active ? "text-[#f2f3f5]" : "text-[#6d6f78] group-hover:text-[#8e9297]")} />
       <span className="truncate">{channel.name}</span>
+      {channel.nsfw && (
+        <span className="shrink-0 rounded bg-[#ed4245]/20 px-1 py-0.5 text-[10px] font-medium text-[#ed4245]">
+          NSFW
+        </span>
+      )}
     </button>
   );
 }
@@ -139,10 +152,10 @@ function ChannelGroup({ label, channels: initialChannels, activeChannelId, serve
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Keep in sync if parent channels change
-  if (localChannels.length !== initialChannels.length || localChannels.some((c, i) => c.id !== initialChannels[i]?.id)) {
+  // Keep in sync if parent channels change (e.g. after a server action)
+  useEffect(() => {
     setLocalChannels(initialChannels);
-  }
+  }, [initialChannels]);
 
   function handleDragEnd(event: DragEndEvent): void {
     const { active, over } = event;
@@ -208,6 +221,8 @@ export function ChannelSidebar({
   serverId,
   serverName,
   serverIconUrl,
+  serverBannerUrl,
+  serverDescription,
   channels,
   categories,
   profile,
@@ -252,7 +267,7 @@ export function ChannelSidebar({
   async function handleReorderEnd(reordered: Tables<"channels">[]): Promise<void> {
     const order = reordered.map((c, i) => ({ id: c.id, position: i, categoryId: c.category_id }));
     const result = await reorderChannels({ order });
-    if (result?.error) {
+    if (result.error) {
       toast.error(result.error);
     }
   }
@@ -276,6 +291,18 @@ export function ChannelSidebar({
 
   return (
     <aside className="flex w-60 min-w-[240px] flex-col bg-[#2b2d31]">
+      {serverBannerUrl && (
+        <div className="relative h-20 w-full shrink-0 overflow-hidden">
+          <Image
+            src={serverBannerUrl}
+            alt="Server banner"
+            fill
+            className="object-cover"
+            sizes="240px"
+            unoptimized
+          />
+        </div>
+      )}
       <div className="flex h-12 items-center justify-between border-b border-[#1e1f22] px-4 shadow-sm">
         <h2 className="flex-1 truncate text-sm font-semibold text-white">
           {serverName}
@@ -404,6 +431,9 @@ export function ChannelSidebar({
           {serverNickname && (
             <p className="truncate text-xs text-[#8e9297]">{profile.username}</p>
           )}
+          {profile.custom_status && (
+            <p className="truncate text-xs text-[#8e9297]">{profile.custom_status}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-0.5">
@@ -463,6 +493,8 @@ export function ChannelSidebar({
         serverId={serverId}
         serverName={serverName}
         serverIconUrl={serverIconUrl ?? null}
+        serverBannerUrl={serverBannerUrl ?? null}
+        serverDescription={serverDescription ?? null}
         isOwner={isOwner}
         isAdmin={isAdmin}
         channels={channels}

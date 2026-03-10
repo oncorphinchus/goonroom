@@ -52,7 +52,12 @@ export async function createServer(
     .from("server_invites")
     .insert({ server_id: server.id, code, created_by: user.id });
 
-  if (inviteErr) return { error: inviteErr.message };
+  if (inviteErr) {
+    await supabase.from("channels").delete().eq("server_id", server.id);
+    await supabase.from("server_members").delete().eq("server_id", server.id).eq("user_id", user.id);
+    await supabase.from("servers").delete().eq("id", server.id);
+    return { error: inviteErr.message };
+  }
 
   return { data: { server, inviteCode: code } };
 }
@@ -115,21 +120,17 @@ export async function getMyServers(): Promise<Server[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: memberships } = await supabase
+  const { data } = await supabase
     .from("server_members")
-    .select("server_id")
-    .eq("user_id", user.id);
+    .select("servers(*)")
+    .eq("user_id", user.id)
+    .order("joined_at");
 
-  if (!memberships || memberships.length === 0) return [];
+  if (!data) return [];
 
-  const serverIds = memberships.map((m) => m.server_id);
-  const { data: servers } = await supabase
-    .from("servers")
-    .select("*")
-    .in("id", serverIds)
-    .order("created_at");
-
-  return servers ?? [];
+  return data
+    .map((row) => row.servers as Server | null)
+    .filter((s): s is Server => s !== null);
 }
 
 const createInviteSchema = z.object({
@@ -172,6 +173,7 @@ const updateServerSchema = z.object({
   serverId: z.string().uuid(),
   name: z.string().min(1, "Server name is required").max(100).optional(),
   iconUrl: z.string().url().nullable().optional(),
+  bannerUrl: z.string().url().nullable().optional(),
   description: z.string().max(500).nullable().optional(),
 });
 
@@ -188,9 +190,10 @@ export async function updateServer(
   const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
   if (role !== "owner" && role !== "admin") return { error: "Only admins can update server settings." };
 
-  const updates: Record<string, unknown> = {};
+  const updates: import("@/types/database").TablesUpdate<"servers"> = {};
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.iconUrl !== undefined) updates.icon_url = parsed.data.iconUrl;
+  if (parsed.data.bannerUrl !== undefined) updates.banner_url = parsed.data.bannerUrl;
   if (parsed.data.description !== undefined) updates.description = parsed.data.description;
 
   if (Object.keys(updates).length === 0) return {};
@@ -335,9 +338,11 @@ export async function reorderCategories(
   const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
   if (role !== "owner" && role !== "admin") return { error: "Only admins can reorder categories." };
 
-  for (const { id, position } of parsed.data.order) {
-    await supabase.from("channel_categories").update({ position }).eq("id", id);
-  }
+  await Promise.all(
+    parsed.data.order.map(({ id, position }) =>
+      supabase.from("channel_categories").update({ position }).eq("id", id),
+    ),
+  );
 
   return {};
 }

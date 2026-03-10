@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 
 interface LoginPageProps {
-  searchParams: Promise<{ message?: string; error?: string }>;
+  searchParams: Promise<{ message?: string; error?: string; redirectTo?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
       )}
 
-      <LoginForm />
+      <LoginForm redirectTo={params.redirectTo} />
 
       <p className="mt-6 text-center text-sm text-[#8e9297]">
         Don&apos;t have an account?{" "}

@@ -24,9 +24,10 @@ import {
   requestPresignedUrl,
   insertMediaItem,
 } from "@/features/media/actions";
+import { createMessageWithMedia } from "@/features/chat/actions";
 import type { MediaItem } from "@/types/media";
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10 GB (effectively no limit for personal use)
 
 type FileStatus =
   | "pending"
@@ -43,6 +44,7 @@ interface FileEntry {
   progress: number;
   error: string | null;
   previewUrl: string | null;
+  mediaId?: string;
 }
 
 interface UploadModalProps {
@@ -50,6 +52,7 @@ interface UploadModalProps {
   onOpenChange: (open: boolean) => void;
   channelId: string;
   postId?: string;
+  embedInChat?: boolean;
   onFileQueued: (tempId: string, fileName: string) => void;
   onFileComplete: (tempId: string, item: MediaItem) => void;
   onFileFailed: (tempId: string) => void;
@@ -135,6 +138,48 @@ function getVideoDuration(file: File): Promise<number | null> {
   });
 }
 
+function generateVideoThumbnail(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(file);
+
+    video.onloadeddata = (): void => {
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = (): void => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.min(320, video.videoWidth);
+      canvas.height = Math.min(320, video.videoHeight);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas 2D context unavailable"));
+        return;
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Video thumbnail generation failed"));
+        },
+        "image/jpeg",
+        0.8,
+      );
+    };
+
+    video.onerror = (): void => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load video for thumbnail"));
+    };
+
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    video.load();
+  });
+}
+
 function putWithProgress(
   url: string,
   body: Blob,
@@ -187,6 +232,7 @@ export function UploadModal({
   onOpenChange,
   channelId,
   postId,
+  embedInChat = false,
   onFileQueued,
   onFileComplete,
   onFileFailed,
@@ -260,7 +306,27 @@ export function UploadModal({
         }
 
         if (video) {
+          updateEntry(entry.id, { status: "thumbnail" });
           durationSeconds = await getVideoDuration(entry.file);
+          try {
+            const thumbBlob = await generateVideoThumbnail(entry.file);
+            const thumbPresign = await requestPresignedUrl({
+              fileName: `thumb_${entry.file.name.replace(/\.[^.]+$/, "")}.jpg`,
+              mimeType: "image/jpeg",
+              prefix: "thumbnails",
+            });
+            if (thumbPresign.data) {
+              await putWithProgress(
+                thumbPresign.data.uploadUrl,
+                thumbBlob,
+                "image/jpeg",
+                () => {},
+              );
+              thumbnailUrl = thumbPresign.data.fileUrl;
+            }
+          } catch {
+            // Video thumbnail optional; continue without
+          }
         }
 
         updateEntry(entry.id, { status: "uploading", progress: 0 });
@@ -299,7 +365,7 @@ export function UploadModal({
           throw new Error(result.error ?? "Failed to save media item");
         }
 
-        updateEntry(entry.id, { status: "done", progress: 100 });
+        updateEntry(entry.id, { status: "done", progress: 100, mediaId: result.data.id });
         toast.success("Upload complete");
         callbackRefs.current.onFileComplete(entry.id, result.data);
       } catch (e) {
@@ -338,7 +404,7 @@ export function UploadModal({
             file,
             status: "error",
             progress: 0,
-            error: `File too large (${formatBytes(file.size)}). Max 500 MB.`,
+            error: `File too large (${formatBytes(file.size)}). Max 10 GB.`,
             previewUrl: null,
           });
           continue;
@@ -420,6 +486,27 @@ export function UploadModal({
   const doneCount = entries.filter((e) => e.status === "done").length;
   const errorCount = entries.filter((e) => e.status === "error").length;
 
+  const hasEmbeddedBatch = useRef(false);
+  useEffect(() => {
+    if (!embedInChat || isProcessing || hasEmbeddedBatch.current) return;
+    const doneWithMedia = entries.filter(
+      (e): e is FileEntry & { mediaId: string } => e.status === "done" && !!e.mediaId,
+    );
+    if (doneWithMedia.length === 0) return;
+    hasEmbeddedBatch.current = true;
+    createMessageWithMedia({
+      channelId,
+      postId: postId ?? null,
+      mediaIds: doneWithMedia.map((e) => e.mediaId),
+    }).then((err) => {
+      if (err?.error) toast.error(err.error);
+    });
+  }, [embedInChat, isProcessing, entries, channelId, postId]);
+
+  useEffect(() => {
+    if (open) hasEmbeddedBatch.current = false;
+  }, [open]);
+
   const handleClose = useCallback(
     (value: boolean) => {
       if (!value && isProcessing) return;
@@ -439,8 +526,7 @@ export function UploadModal({
         <DialogHeader>
           <DialogTitle className="text-white">Upload Media</DialogTitle>
           <DialogDescription className="text-[#8e9297]">
-            Drag & drop files or click to browse. Images and videos up to
-            500&nbsp;MB.
+            Drag & drop files or click to browse.             Images and videos up to 10 GB.
           </DialogDescription>
         </DialogHeader>
 
@@ -473,7 +559,7 @@ export function UploadModal({
               {dragging ? "Drop files here" : "Click or drag files here"}
             </p>
             <p className="text-xs text-[#72767d]">
-              Images &amp; Videos &bull; Max 500 MB each
+              Images &amp; Videos &bull; Max 10 GB each
             </p>
           </div>
         ) : (

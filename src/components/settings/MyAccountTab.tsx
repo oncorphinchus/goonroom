@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { Pencil, Check, X, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { updateUsername, updatePassword, deleteAccount } from "@/features/auth/actions";
+import { updateUsername, updatePassword, updateEmail, deleteAccount } from "@/features/auth/actions";
 import type { Tables } from "@/types/database";
 
 interface MyAccountTabProps {
   profile: Tables<"profiles">;
   email: string;
+  newEmail?: string | null;
   onUsernameUpdated: (username: string) => void;
 }
 
@@ -49,7 +50,7 @@ function InfoRow({
   );
 }
 
-export function MyAccountTab({ profile, email, onUsernameUpdated }: MyAccountTabProps): React.ReactNode {
+export function MyAccountTab({ profile, email, newEmail, onUsernameUpdated }: MyAccountTabProps): React.ReactNode {
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState(profile.username);
   const [usernameLoading, setUsernameLoading] = useState(false);
@@ -61,6 +62,11 @@ export function MyAccountTab({ profile, email, onUsernameUpdated }: MyAccountTab
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -77,6 +83,20 @@ export function MyAccountTab({ profile, email, onUsernameUpdated }: MyAccountTab
     toast.success("Username updated.");
     onUsernameUpdated(usernameInput);
     setEditingUsername(false);
+  }
+
+  async function handleSaveEmail(): Promise<void> {
+    setEmailLoading(true);
+    const result = await updateEmail({ newEmail: newEmailInput, password: emailPassword });
+    setEmailLoading(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Check your inbox to confirm the new email address.");
+    setShowEmailForm(false);
+    setNewEmailInput("");
+    setEmailPassword("");
   }
 
   async function handleSavePassword(): Promise<void> {
@@ -169,7 +189,62 @@ export function MyAccountTab({ profile, email, onUsernameUpdated }: MyAccountTab
             </div>
           </div>
 
-          <InfoRow label="Email" value={email} />
+          <div className="rounded-md bg-[#1e1f22] px-4 py-3">
+            <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-[#80848e]">
+              Email
+            </p>
+            {newEmail ? (
+              <p className="text-sm text-[#f2f3f5]">
+                {email} → <span className="text-[#3ba55c]">{newEmail}</span> (pending confirmation)
+              </p>
+            ) : showEmailForm ? (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="email"
+                  value={newEmailInput}
+                  onChange={(e) => setNewEmailInput(e.target.value)}
+                  placeholder="New email address"
+                  className="w-full rounded bg-[#313338] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
+                />
+                <input
+                  type="password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  placeholder="Current password"
+                  className="w-full rounded bg-[#313338] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveEmail()}
+                    disabled={emailLoading || !newEmailInput || !emailPassword}
+                    className="flex items-center gap-2 rounded bg-[#5865f2] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#4752c4] disabled:opacity-50"
+                  >
+                    {emailLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowEmailForm(false); setNewEmailInput(""); setEmailPassword(""); }}
+                    className="rounded px-4 py-1.5 text-sm font-medium text-[#8e9297] transition-colors hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#f2f3f5]">{email}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowEmailForm(true)}
+                  className="rounded bg-[#4e5058] px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-[#6d6f78]"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
           <InfoRow label="User ID" value={profile.id} />
           <InfoRow label="Member Since" value={memberSince} />
         </div>

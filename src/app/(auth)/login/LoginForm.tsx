@@ -13,11 +13,16 @@ import { signIn } from "@/features/auth/actions";
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
+  redirectTo: z.string().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+interface LoginFormProps {
+  redirectTo?: string;
+}
+
+export function LoginForm({ redirectTo }: LoginFormProps) {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -26,11 +31,16 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { redirectTo: redirectTo ?? "" },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setServerError(null);
-    const result = await signIn(data);
+    const result = await signIn({
+      email: data.email,
+      password: data.password,
+      redirectTo: data.redirectTo || undefined,
+    });
     if (result?.error) setServerError(result.error);
   };
 

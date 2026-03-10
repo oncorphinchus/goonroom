@@ -41,6 +41,8 @@ interface ServerSettingsModalProps {
   serverId: string;
   serverName: string;
   serverIconUrl: string | null;
+  serverBannerUrl?: string | null;
+  serverDescription?: string | null;
   isOwner: boolean;
   isAdmin: boolean;
   channels: Tables<"channels">[];
@@ -52,22 +54,31 @@ function OverviewTab({
   serverId,
   serverName,
   serverIconUrl,
+  serverBannerUrl,
+  serverDescription,
   onClose,
 }: {
   serverId: string;
   serverName: string;
   serverIconUrl: string | null;
+  serverBannerUrl: string | null;
+  serverDescription: string | null;
   onClose: () => void;
 }): React.ReactNode {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(serverName);
+  const [description, setDescription] = useState(serverDescription ?? "");
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const displayIcon = iconPreview ?? serverIconUrl;
+  const displayBanner = bannerPreview ?? serverBannerUrl;
   const initials = serverName.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +91,21 @@ function OverviewTab({
     setIconPreview(URL.createObjectURL(f));
   }, []);
 
-  const isDirty = name.trim() !== serverName || !!iconFile;
+  const handleBannerSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { setError("Please select an image file."); return; }
+    if (f.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
+    setError(null);
+    setBannerFile(f);
+    setBannerPreview(URL.createObjectURL(f));
+  }, []);
+
+  const isDirty =
+    name.trim() !== serverName ||
+    description.trim() !== (serverDescription ?? "") ||
+    !!iconFile ||
+    !!bannerFile;
 
   async function handleSave(): Promise<void> {
     if (!isDirty) return;
@@ -106,10 +131,31 @@ function OverviewTab({
       newIconUrl = presignResult.data.fileUrl;
     }
 
+    let newBannerUrl: string | undefined;
+    if (bannerFile) {
+      const presignResult = await requestPresignedUrl({ fileName: bannerFile.name, mimeType: bannerFile.type, prefix: "banners" });
+      if (presignResult.error || !presignResult.data) {
+        setError(presignResult.error ?? "Failed to get upload URL.");
+        toast.error(presignResult.error ?? "Failed to get upload URL.");
+        setSaving(false);
+        return;
+      }
+      const res = await fetch(presignResult.data.uploadUrl, { method: "PUT", body: bannerFile, headers: { "Content-Type": bannerFile.type } });
+      if (!res.ok) {
+        setError("Failed to upload banner.");
+        toast.error("Failed to upload banner.");
+        setSaving(false);
+        return;
+      }
+      newBannerUrl = presignResult.data.fileUrl;
+    }
+
     const result = await updateServer({
       serverId,
       name: name.trim() !== serverName ? name.trim() : undefined,
       iconUrl: newIconUrl,
+      bannerUrl: newBannerUrl,
+      description: description.trim() !== (serverDescription ?? "") ? (description.trim() || null) : undefined,
     });
 
     if (result.error) {
@@ -160,6 +206,40 @@ function OverviewTab({
         </div>
       </div>
 
+      {/* Banner upload */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => bannerRef.current?.click()}
+            className="group relative flex h-16 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1e1f22]"
+          >
+            {displayBanner ? (
+              <Image src={displayBanner} alt="Banner" fill className="object-cover" sizes="128px" unoptimized={!!bannerPreview} />
+            ) : (
+              <span className="text-xs text-[#8e9297]">No banner</span>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+              <Camera className="h-4 w-4 text-white" />
+            </div>
+          </button>
+          <input ref={bannerRef} type="file" accept="image/*" onChange={handleBannerSelect} className="hidden" />
+          <div>
+            <p className="text-sm font-medium text-white">Server Banner</p>
+            <p className="mt-0.5 text-xs text-[#8e9297]">Shown at top of channel sidebar. Max 5 MB.</p>
+            {bannerPreview && (
+              <button
+                type="button"
+                onClick={() => { setBannerPreview(null); setBannerFile(null); }}
+                className="mt-1 text-xs text-[#ed4245] hover:underline"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Server name */}
       <div>
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#b5bac1]">
@@ -171,6 +251,22 @@ function OverviewTab({
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-md bg-[#1e1f22] px-3 py-2.5 text-sm text-white placeholder-[#4f545c] outline-none focus:ring-2 focus:ring-[#5865f2]"
         />
+      </div>
+
+      {/* Server description */}
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#b5bac1]">
+          Server Description
+          <span className="ml-1 normal-case tracking-normal text-[#4f545c]">(optional)</span>
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value.slice(0, 500))}
+          placeholder="What is this server about?"
+          rows={3}
+          className="w-full rounded-md bg-[#1e1f22] px-3 py-2.5 text-sm text-white placeholder-[#4f545c] outline-none focus:ring-2 focus:ring-[#5865f2]"
+        />
+        <p className="mt-0.5 text-xs text-[#8e9297]">{description.length}/500</p>
       </div>
 
       {error && (
@@ -598,6 +694,8 @@ export function ServerSettingsModal({
   serverId,
   serverName,
   serverIconUrl,
+  serverBannerUrl,
+  serverDescription,
   isOwner,
   isAdmin,
   channels,
@@ -677,6 +775,8 @@ export function ServerSettingsModal({
                 serverId={serverId}
                 serverName={serverName}
                 serverIconUrl={serverIconUrl}
+                serverBannerUrl={serverBannerUrl ?? null}
+                serverDescription={serverDescription ?? null}
                 onClose={close}
               />
             )}

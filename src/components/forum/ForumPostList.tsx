@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageSquareText, Plus, Loader2, Images, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MessageSquareText, Pencil, Plus, Loader2, Images, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { ForumPostCard } from "./ForumPostCard";
 import { CreatePostModal } from "./CreatePostModal";
 import { ForumMediaTab } from "./ForumMediaTab";
+import { EditChannelModal } from "@/components/layout/EditChannelModal";
 import { fetchForumPosts } from "@/features/forum/actions";
 import type { Tables } from "@/types/database";
 import type { ForumPostWithProfile } from "@/types/forum";
@@ -15,6 +17,7 @@ import { FORUM_PAGE_SIZE } from "@/types/forum";
 interface ForumPostListProps {
   channel: Tables<"channels">;
   serverId: string;
+  isAdmin?: boolean;
 }
 
 type ViewTab = "posts" | "media";
@@ -22,7 +25,9 @@ type ViewTab = "posts" | "media";
 export function ForumPostList({
   channel,
   serverId,
+  isAdmin = false,
 }: ForumPostListProps): React.ReactNode {
+  const router = useRouter();
   const [tab, setTab] = useState<ViewTab>("posts");
   const [posts, setPosts] = useState<ForumPostWithProfile[]>([]);
   const [total, setTotal] = useState(0);
@@ -30,6 +35,7 @@ export function ForumPostList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editChannelOpen, setEditChannelOpen] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -166,7 +172,7 @@ export function ForumPostList({
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[#1e1f22] bg-[#313338] px-4 shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <MessageSquareText className="h-5 w-5 shrink-0 text-[#8e9297]" />
           <span className="font-semibold text-white">{channel.name}</span>
           {channel.description && (
@@ -179,14 +185,26 @@ export function ForumPostList({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-md bg-[#5865f2] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#4752c4]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Post
-        </button>
+        <div className="ml-4 flex shrink-0 items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setEditChannelOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded text-[#b5bac1] transition-colors hover:bg-[#404249] hover:text-white"
+              aria-label="Edit channel"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1.5 rounded-md bg-[#5865f2] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#4752c4]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Post
+          </button>
+        </div>
       </header>
 
       <div className="flex shrink-0 gap-1 border-b border-[#1e1f22] bg-[#2b2d31] px-4 py-1">
@@ -281,6 +299,13 @@ export function ForumPostList({
         onOpenChange={setCreateOpen}
         channelId={channel.id}
         serverId={serverId}
+      />
+
+      <EditChannelModal
+        open={editChannelOpen}
+        onOpenChange={setEditChannelOpen}
+        channel={channel}
+        onSaved={() => router.refresh()}
       />
     </div>
   );

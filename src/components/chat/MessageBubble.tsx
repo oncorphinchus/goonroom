@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Pencil, Reply, Smile, Trash2, Pin } from "lucide-react";
+import Image from "next/image";
+import { Pencil, Reply, Smile, Trash2, Pin, Film } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, formatMessageTime } from "@/lib/utils";
@@ -13,6 +14,9 @@ import { UserProfileCard } from "@/components/layout/UserProfileCard";
 import type { MessageGroup, MessageWithProfile } from "@/types/chat";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/;
+function extractFirstUrl(content: string): string | null {
+  return content.match(URL_REGEX)?.[0] ?? null;
+}
 
 interface MessageBubbleProps {
   group: MessageGroup;
@@ -188,6 +192,9 @@ export function MessageBubble({
             {formatMessageTime(group.timestamp)}
           </span>
         </div>
+        {group.customStatus && (
+          <p className="mt-0.5 text-xs text-[#72767d]">{group.customStatus}</p>
+        )}
 
         {group.messages.map((message) => (
           <div
@@ -318,11 +325,53 @@ export function MessageBubble({
               </div>
             )}
 
+            {/* Media attachments */}
+            {message._media && message._media.length > 0 && !message._pending && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {message._media.map((item) =>
+                  item.mime_type.startsWith("image/") ? (
+                    <a
+                      key={item.id}
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative block max-h-64 max-w-xs overflow-hidden rounded-md"
+                    >
+                      <Image
+                        src={item.thumbnail_url ?? item.file_url}
+                        alt={item.file_name}
+                        width={320}
+                        height={240}
+                        className="max-h-64 w-auto rounded-md object-cover"
+                        unoptimized
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      key={item.id}
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-md bg-[#2b2d31] px-3 py-2 text-sm text-[#dcddde] transition-colors hover:bg-[#35373c]"
+                    >
+                      <Film className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.file_name}</span>
+                      {item.duration_seconds != null && (
+                        <span className="text-xs text-[#72767d]">
+                          {Math.floor(item.duration_seconds / 60)}:
+                          {String(item.duration_seconds % 60).padStart(2, "0")}
+                        </span>
+                      )}
+                    </a>
+                  ),
+                )}
+              </div>
+            )}
+
             {/* Link preview */}
-            {!message._pending && (() => {
-              const match = message.content.match(URL_REGEX);
-              return match ? <LinkPreview url={match[0]} /> : null;
-            })()}
+            {!message._pending && extractFirstUrl(message.content) && (
+              <LinkPreview url={extractFirstUrl(message.content)!} />
+            )}
 
             {/* Pinned indicator */}
             {message.pinned && !message._pending && (

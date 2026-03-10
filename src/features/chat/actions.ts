@@ -19,7 +19,7 @@ export async function sendMessage(input: {
   postId?: string | null;
   replyToId?: string | null;
   content: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = sendMessageSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -81,6 +81,95 @@ export async function sendMessage(input: {
   if (insertError) {
     return { error: insertError.message };
   }
+  return {};
+}
+
+const createMessageWithMediaSchema = z.object({
+  channelId: z.string().uuid("Invalid channel ID"),
+  postId: z.string().uuid("Invalid post ID").nullable().optional(),
+  mediaIds: z.array(z.string().uuid()).min(1, "At least one media ID required"),
+});
+
+export async function createMessageWithMedia(input: {
+  channelId: string;
+  postId?: string | null;
+  mediaIds: string[];
+}): Promise<{ error?: string }> {
+  const parsed = createMessageWithMediaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: "Not authenticated. Please sign in again." };
+  }
+
+  const { data: channel, error: chanErr } = await supabase
+    .from("channels")
+    .select("id, type")
+    .eq("id", parsed.data.channelId)
+    .single();
+
+  if (chanErr || !channel) {
+    return { error: "Channel not found." };
+  }
+
+  const postId = parsed.data.postId ?? null;
+
+  if (channel.type === "TEXT" && postId) {
+    return { error: "Text channels do not support posts." };
+  }
+
+  if (channel.type === "FORUM") {
+    if (!postId) {
+      return { error: "Forum channels require a post context." };
+    }
+    const { data: post, error: postErr } = await supabase
+      .from("forum_posts")
+      .select("id, locked")
+      .eq("id", postId)
+      .eq("channel_id", parsed.data.channelId)
+      .single();
+
+    if (postErr || !post) {
+      return { error: "Post not found in this channel." };
+    }
+    if (post.locked) {
+      return { error: "This post is locked." };
+    }
+  }
+
+  const { data: message, error: insertError } = await supabase
+    .from("messages")
+    .insert({
+      channel_id: parsed.data.channelId,
+      post_id: postId,
+      user_id: user.id,
+      content: "",
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !message) {
+    return { error: insertError?.message ?? "Failed to create message" };
+  }
+
+  const { error: updateErr } = await supabase
+    .from("media_attachments")
+    .update({ message_id: message.id })
+    .in("id", parsed.data.mediaIds)
+    .eq("user_id", user.id);
+
+  if (updateErr) {
+    return { error: updateErr.message };
+  }
+  return {};
 }
 
 const deleteMessageSchema = z.object({
@@ -89,7 +178,7 @@ const deleteMessageSchema = z.object({
 
 export async function deleteMessage(input: {
   messageId: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = deleteMessageSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -107,7 +196,7 @@ export async function deleteMessage(input: {
 
   const { data: message, error: fetchErr } = await supabase
     .from("messages")
-    .select("id, user_id")
+    .select("id, user_id, channel_id")
     .eq("id", parsed.data.messageId)
     .single();
 
@@ -116,7 +205,21 @@ export async function deleteMessage(input: {
   }
 
   if (message.user_id !== user.id) {
-    return { error: "You can only delete your own messages." };
+    const { data: channel } = await supabase
+      .from("channels")
+      .select("server_id")
+      .eq("id", message.channel_id)
+      .single();
+
+    if (!channel) return { error: "Channel not found." };
+
+    const { data: role } = await supabase.rpc("get_server_role", {
+      target_server_id: channel.server_id,
+    });
+
+    if (role !== "owner" && role !== "admin") {
+      return { error: "You can only delete your own messages." };
+    }
   }
 
   const { error: deleteErr } = await supabase
@@ -127,6 +230,7 @@ export async function deleteMessage(input: {
   if (deleteErr) {
     return { error: deleteErr.message };
   }
+  return {};
 }
 
 const editMessageSchema = z.object({
@@ -140,7 +244,7 @@ const editMessageSchema = z.object({
 export async function editMessage(input: {
   messageId: string;
   content: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = editMessageSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -181,6 +285,7 @@ export async function editMessage(input: {
   if (updateErr) {
     return { error: updateErr.message };
   }
+  return {};
 }
 
 const reactionSchema = z.object({
@@ -191,7 +296,7 @@ const reactionSchema = z.object({
 export async function addReaction(input: {
   messageId: string;
   emoji: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = reactionSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -232,12 +337,13 @@ export async function addReaction(input: {
   if (insertErr) {
     return { error: insertErr.message };
   }
+  return {};
 }
 
 export async function removeReaction(input: {
   messageId: string;
   emoji: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = reactionSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -263,6 +369,7 @@ export async function removeReaction(input: {
   if (deleteErr) {
     return { error: deleteErr.message };
   }
+  return {};
 }
 
 const pinMessageSchema = z.object({
@@ -271,7 +378,7 @@ const pinMessageSchema = z.object({
 
 export async function pinMessage(input: {
   messageId: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = pinMessageSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -323,11 +430,12 @@ export async function pinMessage(input: {
   if (updateErr) {
     return { error: updateErr.message };
   }
+  return {};
 }
 
 export async function unpinMessage(input: {
   messageId: string;
-}): Promise<{ error: string } | undefined> {
+}): Promise<{ error?: string }> {
   const parsed = pinMessageSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -379,6 +487,7 @@ export async function unpinMessage(input: {
   if (updateErr) {
     return { error: updateErr.message };
   }
+  return {};
 }
 
 const fetchPinnedSchema = z.object({

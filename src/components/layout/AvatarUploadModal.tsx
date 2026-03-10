@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { requestPresignedUrl } from "@/features/media/actions";
 import { updateAvatar } from "@/features/auth/avatar";
+import { AvatarCropModal } from "@/components/settings/AvatarCropModal";
 
 interface AvatarUploadModalProps {
   open: boolean;
@@ -30,6 +31,8 @@ export function AvatarUploadModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,19 +57,20 @@ export function AvatarUploadModal({
 
     setError(null);
     setFile(selected);
-    const objectUrl = URL.createObjectURL(selected);
-    setPreview(objectUrl);
+    setCropFile(selected);
+    setCropOpen(true);
+    e.target.value = "";
   }, []);
 
-  async function handleUpload(): Promise<void> {
-    if (!file) return;
+  async function uploadCroppedBlob(blob: Blob): Promise<void> {
+    const uploadFile = new File([blob], "avatar.jpg", { type: "image/jpeg" });
     setUploading(true);
     setError(null);
 
     const presignResult = await requestPresignedUrl({
-      fileName: file.name,
-      mimeType: file.type,
-      prefix: "media",
+      fileName: uploadFile.name,
+      mimeType: uploadFile.type,
+      prefix: "avatars",
     });
 
     if (presignResult.error || !presignResult.data) {
@@ -80,8 +84,8 @@ export function AvatarUploadModal({
     try {
       const res = await fetch(presignResult.data.uploadUrl, {
         method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+        body: uploadFile,
+        headers: { "Content-Type": uploadFile.type },
       });
 
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
@@ -108,9 +112,16 @@ export function AvatarUploadModal({
     onOpenChange(false);
   }
 
+  function handleCropped(blob: Blob): void {
+    void uploadCroppedBlob(blob);
+    setCropOpen(false);
+    setCropFile(null);
+  }
+
   const displayUrl = preview ?? currentAvatarUrl;
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(v) => {
@@ -182,15 +193,23 @@ export function AvatarUploadModal({
           </button>
           <button
             type="button"
-            onClick={() => void handleUpload()}
-            disabled={!file || uploading}
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
             className="flex items-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#4752c4] disabled:opacity-50"
           >
             {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {uploading ? "Uploading..." : "Save"}
+            {uploading ? "Uploading..." : "Choose Image"}
           </button>
         </div>
       </DialogContent>
     </Dialog>
+
+    <AvatarCropModal
+      open={cropOpen}
+      onOpenChange={(v) => { setCropOpen(v); if (!v) setCropFile(null); }}
+      file={cropFile}
+      onCropped={handleCropped}
+    />
+    </>
   );
 }
