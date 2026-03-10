@@ -170,7 +170,9 @@ export async function createInvite(
 
 const updateServerSchema = z.object({
   serverId: z.string().uuid(),
-  name: z.string().min(1, "Server name is required").max(100),
+  name: z.string().min(1, "Server name is required").max(100).optional(),
+  iconUrl: z.string().url().nullable().optional(),
+  description: z.string().max(500).nullable().optional(),
 });
 
 export async function updateServer(
@@ -186,13 +188,187 @@ export async function updateServer(
   const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
   if (role !== "owner" && role !== "admin") return { error: "Only admins can update server settings." };
 
+  const updates: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if (parsed.data.iconUrl !== undefined) updates.icon_url = parsed.data.iconUrl;
+  if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+
+  if (Object.keys(updates).length === 0) return {};
+
   const { error } = await supabase
     .from("servers")
-    .update({ name: parsed.data.name })
+    .update(updates)
     .eq("id", parsed.data.serverId);
 
   if (error) return { error: error.message };
   return {};
+}
+
+const createCategorySchema = z.object({
+  serverId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+});
+
+export async function createCategory(
+  input: z.input<typeof createCategorySchema>,
+): Promise<{ data: import("@/types/database").Tables<"channel_categories">; error?: undefined } | { data?: undefined; error: string }> {
+  const parsed = createCategorySchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
+  if (role !== "owner" && role !== "admin") return { error: "Only admins can manage categories." };
+
+  const { data: maxPos } = await supabase
+    .from("channel_categories")
+    .select("position")
+    .eq("server_id", parsed.data.serverId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const nextPosition = (maxPos?.position ?? -1) + 1;
+
+  const { data: category, error } = await supabase
+    .from("channel_categories")
+    .insert({ server_id: parsed.data.serverId, name: parsed.data.name, position: nextPosition })
+    .select()
+    .single();
+
+  if (error || !category) return { error: error?.message ?? "Failed to create category." };
+  return { data: category };
+}
+
+const updateCategorySchema = z.object({
+  categoryId: z.string().uuid(),
+  name: z.string().min(1).max(100).optional(),
+});
+
+export async function updateCategory(
+  input: z.input<typeof updateCategorySchema>,
+): Promise<{ error?: string }> {
+  const parsed = updateCategorySchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: cat } = await supabase
+    .from("channel_categories")
+    .select("server_id")
+    .eq("id", parsed.data.categoryId)
+    .single();
+  if (!cat) return { error: "Category not found." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: cat.server_id });
+  if (role !== "owner" && role !== "admin") return { error: "Only admins can manage categories." };
+
+  if (parsed.data.name !== undefined) {
+    const { error } = await supabase
+      .from("channel_categories")
+      .update({ name: parsed.data.name })
+      .eq("id", parsed.data.categoryId);
+    if (error) return { error: error.message };
+  }
+
+  return {};
+}
+
+const deleteCategorySchema = z.object({
+  categoryId: z.string().uuid(),
+});
+
+export async function deleteCategory(
+  input: z.input<typeof deleteCategorySchema>,
+): Promise<{ error?: string }> {
+  const parsed = deleteCategorySchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: cat } = await supabase
+    .from("channel_categories")
+    .select("server_id")
+    .eq("id", parsed.data.categoryId)
+    .single();
+  if (!cat) return { error: "Category not found." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: cat.server_id });
+  if (role !== "owner" && role !== "admin") return { error: "Only admins can manage categories." };
+
+  // Unassign channels in this category
+  await supabase
+    .from("channels")
+    .update({ category_id: null })
+    .eq("category_id", parsed.data.categoryId);
+
+  const { error } = await supabase
+    .from("channel_categories")
+    .delete()
+    .eq("id", parsed.data.categoryId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+const reorderCategoriesSchema = z.object({
+  serverId: z.string().uuid(),
+  order: z.array(z.object({ id: z.string().uuid(), position: z.number().int() })),
+});
+
+export async function reorderCategories(
+  input: z.input<typeof reorderCategoriesSchema>,
+): Promise<{ error?: string }> {
+  const parsed = reorderCategoriesSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { error: "Not authenticated." };
+
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: parsed.data.serverId });
+  if (role !== "owner" && role !== "admin") return { error: "Only admins can reorder categories." };
+
+  for (const { id, position } of parsed.data.order) {
+    await supabase.from("channel_categories").update({ position }).eq("id", id);
+  }
+
+  return {};
+}
+
+export async function getServerCategories(
+  serverId: string,
+): Promise<import("@/types/database").Tables<"channel_categories">[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("channel_categories")
+    .select("*")
+    .eq("server_id", serverId)
+    .order("position");
+
+  return data ?? [];
+}
+
+export async function getServerInvites(
+  serverId: string,
+): Promise<import("@/types/database").Tables<"server_invites">[]> {
+  const supabase = await createClient();
+  const { data: role } = await supabase.rpc("get_server_role", { target_server_id: serverId });
+  if (role !== "owner" && role !== "admin") return [];
+
+  const { data } = await supabase
+    .from("server_invites")
+    .select("*")
+    .eq("server_id", serverId)
+    .order("created_at", { ascending: false });
+
+  return data ?? [];
 }
 
 const deleteServerSchema = z.object({

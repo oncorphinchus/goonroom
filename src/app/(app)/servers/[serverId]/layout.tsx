@@ -25,7 +25,7 @@ export default async function ServerLayout({
   const currentServer = servers.find((s) => s.id === serverId);
   if (!currentServer) notFound();
 
-  const [profileResult, channelsResult, memberResult] = await Promise.all([
+  const [profileResult, channelsResult, memberResult, categoriesResult, serverProfileResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("channels").select("*").eq("server_id", serverId).order("position"),
     supabase
@@ -34,6 +34,17 @@ export default async function ServerLayout({
       .eq("server_id", serverId)
       .eq("user_id", user.id)
       .single(),
+    supabase
+      .from("channel_categories")
+      .select("*")
+      .eq("server_id", serverId)
+      .order("position"),
+    supabase
+      .from("server_profiles")
+      .select("nickname, server_avatar_url")
+      .eq("server_id", serverId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   if (profileResult.error || !profileResult.data) {
@@ -43,14 +54,18 @@ export default async function ServerLayout({
   }
 
   const userRole = memberResult.data?.role ?? "member";
+  const serverNickname = serverProfileResult.data?.nickname ?? null;
 
   const sidebarElement = (
     <ChannelSidebar
       serverId={serverId}
       serverName={currentServer.name}
+      serverIconUrl={currentServer.icon_url ?? null}
       channels={channelsResult.data ?? []}
+      categories={categoriesResult.data ?? []}
       profile={profileResult.data}
       userRole={userRole}
+      serverNickname={serverNickname}
     />
   );
 

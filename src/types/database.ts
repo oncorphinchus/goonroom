@@ -9,6 +9,38 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      channel_categories: {
+        Row: {
+          id: string;
+          server_id: string;
+          name: string;
+          position: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          server_id: string;
+          name: string;
+          position?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          server_id?: string;
+          name?: string;
+          position?: number;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "channel_categories_server_id_fkey";
+            columns: ["server_id"];
+            isOneToOne: false;
+            referencedRelation: "servers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       channels: {
         Row: {
           id: string;
@@ -18,6 +50,7 @@ export interface Database {
           position: number;
           created_at: string;
           server_id: string;
+          category_id: string | null;
         };
         Insert: {
           id?: string;
@@ -27,6 +60,7 @@ export interface Database {
           position?: number;
           created_at?: string;
           server_id: string;
+          category_id?: string | null;
         };
         Update: {
           id?: string;
@@ -36,6 +70,7 @@ export interface Database {
           position?: number;
           created_at?: string;
           server_id?: string;
+          category_id?: string | null;
         };
         Relationships: [
           {
@@ -43,6 +78,13 @@ export interface Database {
             columns: ["server_id"];
             isOneToOne: false;
             referencedRelation: "servers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "channels_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "channel_categories";
             referencedColumns: ["id"];
           },
         ];
@@ -369,6 +411,42 @@ export interface Database {
           },
         ];
       };
+      server_profiles: {
+        Row: {
+          server_id: string;
+          user_id: string;
+          nickname: string | null;
+          server_avatar_url: string | null;
+        };
+        Insert: {
+          server_id: string;
+          user_id: string;
+          nickname?: string | null;
+          server_avatar_url?: string | null;
+        };
+        Update: {
+          server_id?: string;
+          user_id?: string;
+          nickname?: string | null;
+          server_avatar_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "server_profiles_server_id_fkey";
+            columns: ["server_id"];
+            isOneToOne: false;
+            referencedRelation: "servers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "server_profiles_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       servers: {
         Row: {
           id: string;
@@ -376,6 +454,8 @@ export interface Database {
           icon_url: string | null;
           owner_id: string;
           created_at: string;
+          description: string | null;
+          banner_url: string | null;
         };
         Insert: {
           id?: string;
@@ -383,6 +463,8 @@ export interface Database {
           icon_url?: string | null;
           owner_id: string;
           created_at?: string;
+          description?: string | null;
+          banner_url?: string | null;
         };
         Update: {
           id?: string;
@@ -390,6 +472,8 @@ export interface Database {
           icon_url?: string | null;
           owner_id?: string;
           created_at?: string;
+          description?: string | null;
+          banner_url?: string | null;
         };
         Relationships: [
           {

@@ -1,9 +1,26 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Hash, MessageSquareText, ChevronDown, LogOut, Settings, Plus, Copy, UserCog } from "lucide-react";
+import { GripVertical, Hash, MessageSquareText, ChevronDown, ChevronRight, LogOut, Settings, Plus, Copy, UserCog } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -14,6 +31,7 @@ import {
 } from "@/components/ui/tooltip";
 import { signOut } from "@/features/auth/actions";
 import { createInvite } from "@/features/server/actions";
+import { reorderChannels } from "@/features/channel/actions";
 import { CreateChannelModal } from "./CreateChannelModal";
 import { AvatarUploadModal } from "./AvatarUploadModal";
 import { ServerSettingsModal } from "./ServerSettingsModal";
@@ -22,15 +40,65 @@ import type { Tables } from "@/types/database";
 interface ChannelSidebarProps {
   serverId: string;
   serverName: string;
+  serverIconUrl?: string | null;
   channels: Tables<"channels">[];
+  categories: Tables<"channel_categories">[];
   profile: Tables<"profiles">;
   userRole: string;
+  serverNickname?: string | null;
 }
 
 interface ChannelItemProps {
   channel: Tables<"channels">;
   active: boolean;
   serverId: string;
+  isDraggable?: boolean;
+}
+
+function SortableChannelItem({ channel, active, serverId }: ChannelItemProps): React.ReactNode {
+  const router = useRouter();
+  const Icon = channel.type === "TEXT" ? Hash : MessageSquareText;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: channel.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+        active ? "bg-[#404249] text-[#f2f3f5]" : "text-[#8e9297] hover:bg-[#35373c] hover:text-[#dcddde]",
+      )}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab text-[#4f545c] opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+        tabIndex={-1}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => router.push(`/servers/${serverId}/channels/${channel.id}`)}
+        className="flex min-w-0 flex-1 items-center gap-2"
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 transition-colors",
+            active ? "text-[#f2f3f5]" : "text-[#6d6f78] group-hover:text-[#8e9297]",
+          )}
+        />
+        <span className="truncate">{channel.name}</span>
+      </button>
+    </div>
+  );
 }
 
 function ChannelItem({ channel, active, serverId }: ChannelItemProps): React.ReactNode {
@@ -43,17 +111,10 @@ function ChannelItem({ channel, active, serverId }: ChannelItemProps): React.Rea
       onClick={() => router.push(`/servers/${serverId}/channels/${channel.id}`)}
       className={cn(
         "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-        active
-          ? "bg-[#404249] text-[#f2f3f5]"
-          : "text-[#8e9297] hover:bg-[#35373c] hover:text-[#dcddde]",
+        active ? "bg-[#404249] text-[#f2f3f5]" : "text-[#8e9297] hover:bg-[#35373c] hover:text-[#dcddde]",
       )}
     >
-      <Icon
-        className={cn(
-          "h-4 w-4 shrink-0 transition-colors",
-          active ? "text-[#f2f3f5]" : "text-[#6d6f78] group-hover:text-[#8e9297]",
-        )}
-      />
+      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-[#f2f3f5]" : "text-[#6d6f78] group-hover:text-[#8e9297]")} />
       <span className="truncate">{channel.name}</span>
     </button>
   );
@@ -64,30 +125,81 @@ interface ChannelGroupProps {
   channels: Tables<"channels">[];
   activeChannelId: string | null;
   serverId: string;
+  defaultOpen?: boolean;
+  isAdmin?: boolean;
+  onReorderEnd?: (newOrder: Tables<"channels">[]) => void;
 }
 
-function ChannelGroup({ label, channels, activeChannelId, serverId }: ChannelGroupProps): React.ReactNode {
-  if (channels.length === 0) return null;
+function ChannelGroup({ label, channels: initialChannels, activeChannelId, serverId, defaultOpen = true, isAdmin, onReorderEnd }: ChannelGroupProps): React.ReactNode {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [localChannels, setLocalChannels] = useState(initialChannels);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Keep in sync if parent channels change
+  if (localChannels.length !== initialChannels.length || localChannels.some((c, i) => c.id !== initialChannels[i]?.id)) {
+    setLocalChannels(initialChannels);
+  }
+
+  function handleDragEnd(event: DragEndEvent): void {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localChannels.findIndex((c) => c.id === active.id);
+    const newIndex = localChannels.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(localChannels, oldIndex, newIndex);
+    setLocalChannels(reordered);
+    onReorderEnd?.(reordered);
+  }
+
+  if (localChannels.length === 0) return null;
 
   return (
     <div className="mb-4">
       <button
         type="button"
+        onClick={() => setIsOpen((v) => !v)}
         className="mb-1 flex w-full items-center gap-1 px-1 text-xs font-semibold uppercase tracking-wide text-[#80848e] transition-colors hover:text-[#dcddde]"
       >
-        <ChevronDown className="h-3 w-3" />
+        {isOpen ? (
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0" />
+        )}
         {label}
       </button>
-      <div className="space-y-0.5">
-        {channels.map((channel) => (
-          <ChannelItem
-            key={channel.id}
-            channel={channel}
-            active={channel.id === activeChannelId}
-            serverId={serverId}
-          />
-        ))}
-      </div>
+      {isOpen && (
+        isAdmin ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={localChannels.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-0.5">
+                {localChannels.map((channel) => (
+                  <SortableChannelItem
+                    key={channel.id}
+                    channel={channel}
+                    active={channel.id === activeChannelId}
+                    serverId={serverId}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <div className="space-y-0.5">
+            {localChannels.map((channel) => (
+              <ChannelItem
+                key={channel.id}
+                channel={channel}
+                active={channel.id === activeChannelId}
+                serverId={serverId}
+              />
+            ))}
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -95,9 +207,12 @@ function ChannelGroup({ label, channels, activeChannelId, serverId }: ChannelGro
 export function ChannelSidebar({
   serverId,
   serverName,
+  serverIconUrl,
   channels,
+  categories,
   profile,
   userRole,
+  serverNickname,
 }: ChannelSidebarProps): React.ReactNode {
   const pathname = usePathname();
   const router = useRouter();
@@ -110,20 +225,37 @@ export function ChannelSidebar({
   const channelIdMatch = pathname.match(/\/channels\/([^/]+)/);
   const activeChannelId = channelIdMatch?.[1] ?? null;
 
-  const textChannels = channels
-    .filter((c) => c.type === "TEXT")
-    .sort((a, b) => a.position - b.position);
-
-  const forumChannels = channels
-    .filter((c) => c.type === "FORUM")
-    .sort((a, b) => a.position - b.position);
-
   const isAdmin = userRole === "owner" || userRole === "admin";
   const isOwner = userRole === "owner";
 
-  const initials = profile.username
-    ? profile.username.slice(0, 2).toUpperCase()
-    : "??";
+  const displayName = serverNickname ?? profile.username ?? "Unknown";
+  const initials = displayName.slice(0, 2).toUpperCase();
+
+  // Build category-based groups
+  const categorizedGroups = categories.map((cat) => ({
+    id: cat.id,
+    label: cat.name,
+    channels: channels
+      .filter((c) => c.category_id === cat.id)
+      .sort((a, b) => a.position - b.position),
+  }));
+
+  // Uncategorized channels grouped by type (for backward compat)
+  const uncategorizedChannels = channels.filter((c) => !c.category_id);
+  const uncategorizedText = uncategorizedChannels
+    .filter((c) => c.type === "TEXT")
+    .sort((a, b) => a.position - b.position);
+  const uncategorizedForum = uncategorizedChannels
+    .filter((c) => c.type === "FORUM")
+    .sort((a, b) => a.position - b.position);
+
+  async function handleReorderEnd(reordered: Tables<"channels">[]): Promise<void> {
+    const order = reordered.map((c, i) => ({ id: c.id, position: i, categoryId: c.category_id }));
+    const result = await reorderChannels({ order });
+    if (result?.error) {
+      toast.error(result.error);
+    }
+  }
 
   async function handleCreateInvite(): Promise<void> {
     const result = await createInvite({ serverId });
@@ -189,18 +321,42 @@ export function ChannelSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-3">
-        <ChannelGroup
-          label="Text Channels"
-          channels={textChannels}
-          activeChannelId={activeChannelId}
-          serverId={serverId}
-        />
-        <ChannelGroup
-          label="Forums"
-          channels={forumChannels}
-          activeChannelId={activeChannelId}
-          serverId={serverId}
-        />
+        {/* Category-based groups */}
+        {categorizedGroups.map((group) => (
+          <ChannelGroup
+            key={group.id}
+            label={group.label}
+            channels={group.channels}
+            activeChannelId={activeChannelId}
+            serverId={serverId}
+            isAdmin={isAdmin}
+            onReorderEnd={(reordered) => void handleReorderEnd(reordered)}
+          />
+        ))}
+
+        {/* Uncategorized: text channels */}
+        {uncategorizedText.length > 0 && (
+          <ChannelGroup
+            label="Text Channels"
+            channels={uncategorizedText}
+            activeChannelId={activeChannelId}
+            serverId={serverId}
+            isAdmin={isAdmin}
+            onReorderEnd={(reordered) => void handleReorderEnd(reordered)}
+          />
+        )}
+
+        {/* Uncategorized: forums */}
+        {uncategorizedForum.length > 0 && (
+          <ChannelGroup
+            label="Forums"
+            channels={uncategorizedForum}
+            activeChannelId={activeChannelId}
+            serverId={serverId}
+            isAdmin={isAdmin}
+            onReorderEnd={(reordered) => void handleReorderEnd(reordered)}
+          />
+        )}
 
         {channels.length === 0 && (
           <p className="px-2 text-xs text-[#6d6f78]">No channels yet.</p>
@@ -243,9 +399,11 @@ export function ChannelSidebar({
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium leading-none text-white">
-            {profile.username ?? "Unknown"}
+            {displayName}
           </p>
-          <p className="mt-0.5 text-xs text-[#8e9297]">Online</p>
+          {serverNickname && (
+            <p className="truncate text-xs text-[#8e9297]">{profile.username}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-0.5">
@@ -304,7 +462,11 @@ export function ChannelSidebar({
         onOpenChange={setSettingsOpen}
         serverId={serverId}
         serverName={serverName}
+        serverIconUrl={serverIconUrl ?? null}
         isOwner={isOwner}
+        isAdmin={isAdmin}
+        channels={channels}
+        categories={categories}
       />
     </aside>
   );

@@ -110,6 +110,19 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
     _reactions: reactionsMap.get(m.id) ?? [],
   }));
 
+  const { data: serverProfileRows } = await supabase
+    .from("server_profiles")
+    .select("user_id, nickname, server_avatar_url")
+    .eq("server_id", serverId);
+
+  const serverProfilesMap: Record<string, { nickname: string | null; serverAvatarUrl: string | null }> = {};
+  for (const sp of serverProfileRows ?? []) {
+    serverProfilesMap[sp.user_id] = {
+      nickname: sp.nickname,
+      serverAvatarUrl: sp.server_avatar_url,
+    };
+  }
+
   return (
     <ChatArea
       key={channelId}
@@ -118,6 +131,7 @@ export default async function ChannelPage({ params }: ChannelPageProps): Promise
       currentUserId={user.id}
       isAdmin={isAdmin}
       serverId={serverId}
+      serverProfiles={serverProfilesMap}
     />
   );
 }

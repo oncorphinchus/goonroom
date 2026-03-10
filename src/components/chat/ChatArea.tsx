@@ -19,12 +19,15 @@ import {
 import type { Tables } from "@/types/database";
 import type { MessageWithProfile, ReplySnippet } from "@/types/chat";
 
+type ServerProfileSnippet = { nickname: string | null; serverAvatarUrl: string | null };
+
 interface ChatAreaProps {
   channel: Tables<"channels">;
   initialMessages: MessageWithProfile[];
   currentUserId: string;
   isAdmin?: boolean;
   serverId?: string;
+  serverProfiles?: Record<string, ServerProfileSnippet>;
 }
 
 type ProfileSnippet = Pick<
@@ -38,6 +41,7 @@ export function ChatArea({
   currentUserId,
   isAdmin = false,
   serverId,
+  serverProfiles,
 }: ChatAreaProps): React.ReactNode {
   const [messages, setMessages] =
     useState<MessageWithProfile[]>(initialMessages);
@@ -495,6 +499,7 @@ export function ChatArea({
         channelName={channel.name}
         isAdmin={isAdmin}
         serverId={serverId}
+        serverProfiles={serverProfiles}
         onDeleteMessage={handleDeleteMessage}
         onEditMessage={handleEditMessage}
         onReplyToMessage={handleReplyToMessage}

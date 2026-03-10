@@ -7,7 +7,12 @@ import type { MessageWithProfile, MessageGroup } from "@/types/chat";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
-function groupMessages(messages: MessageWithProfile[]): MessageGroup[] {
+type ServerProfileSnippet = { nickname: string | null; serverAvatarUrl: string | null };
+
+function groupMessages(
+  messages: MessageWithProfile[],
+  serverProfiles?: Record<string, ServerProfileSnippet>,
+): MessageGroup[] {
   const groups: MessageGroup[] = [];
 
   for (const message of messages) {
@@ -24,11 +29,12 @@ function groupMessages(messages: MessageWithProfile[]): MessageGroup[] {
     if (last && isSameUser && isWithinWindow) {
       last.messages.push(message);
     } else {
+      const sp = serverProfiles?.[message.user_id];
       groups.push({
         key: message.id,
         userId: message.user_id,
-        username: message.profiles?.username ?? "Unknown",
-        avatarUrl: message.profiles?.avatar_url ?? null,
+        username: sp?.nickname ?? message.profiles?.username ?? "Unknown",
+        avatarUrl: sp?.serverAvatarUrl ?? message.profiles?.avatar_url ?? null,
         timestamp: message.created_at,
         messages: [message],
       });
@@ -76,6 +82,7 @@ interface MessageListProps {
   channelName: string;
   isAdmin?: boolean;
   serverId?: string;
+  serverProfiles?: Record<string, ServerProfileSnippet>;
   onDeleteMessage: (messageId: string) => void;
   onEditMessage: (messageId: string, content: string) => void;
   onReplyToMessage: (message: MessageWithProfile) => void;
@@ -91,6 +98,7 @@ export function MessageList({
   channelName,
   isAdmin = false,
   serverId,
+  serverProfiles,
   onDeleteMessage,
   onEditMessage,
   onReplyToMessage,
@@ -133,7 +141,7 @@ export function MessageList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onScrollToMessageRef]);
 
-  const groups = groupMessages(messages);
+  const groups = groupMessages(messages, serverProfiles);
 
   let lastDateKey = "";
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import { motion } from "framer-motion";
@@ -45,11 +46,13 @@ function ServerIcon({
           <Link
             href={`/servers/${server.id}`}
             className={cn(
-              "group relative flex h-12 w-12 items-center justify-center rounded-[24px] transition-all duration-200",
+              "group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-[24px] transition-all duration-200",
               "hover:rounded-[16px]",
               active
                 ? "rounded-[16px] bg-[#5865f2] text-white"
-                : "bg-[#313338] text-[#949ba4] hover:bg-[#5865f2] hover:text-white",
+                : server.icon_url
+                  ? "rounded-[16px]"
+                  : "bg-[#313338] text-[#949ba4] hover:bg-[#5865f2] hover:text-white",
             )}
           >
             {active && (
@@ -59,7 +62,18 @@ function ServerIcon({
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
             )}
-            <span className="text-sm font-bold select-none">{initials}</span>
+            {server.icon_url ? (
+              <Image
+                src={server.icon_url}
+                alt={server.name}
+                fill
+                className="object-cover"
+                sizes="48px"
+                unoptimized
+              />
+            ) : (
+              <span className="text-sm font-bold select-none">{initials}</span>
+            )}
           </Link>
         </TooltipTrigger>
         <TooltipContent

@@ -170,15 +170,15 @@ Below are grouped phases covering every major Discord feature not yet in GoonRoo
 
 ### Phase 13: Server Profile & Customization
 
-- [ ] 13.1 **Server-specific profile** — `server_profiles` table (`server_id`, `user_id`, `nickname`, `server_avatar_url`), optional per-server identity override
-- [ ] 13.2 **Set server nickname** — edit in server member dropdown or member list right-click, displayed in place of global username within that server
-- [ ] 13.3 **Server avatar per user** — upload per-server avatar, stored via presigned URL, shown in messages within that server
-- [ ] 13.4 **Server icon upload** — update `servers.icon_url` via presigned upload + `updateServer` action, crop/resize before upload, displayed in NavBar + server header
+- [x] 13.1 **Server-specific profile** — `server_profiles` table (`server_id`, `user_id`, `nickname`, `server_avatar_url`), optional per-server identity override
+- [x] 13.2 **Set server nickname** — edit in server member dropdown or member list right-click, displayed in place of global username within that server
+- [x] 13.3 **Server avatar per user** — upload per-server avatar, stored via presigned URL, shown in messages within that server
+- [x] 13.4 **Server icon upload** — update `servers.icon_url` via presigned upload + `updateServer` action, crop/resize before upload, displayed in NavBar + server header
 - [ ] 13.5 **Server banner** — `banner_url` column on `servers`, displayed at top of channel sidebar, configurable by owner/admin
 - [ ] 13.6 **Server description** — `description` column on `servers`, shown in server settings and invite preview
-- [ ] 13.7 **Server settings overhaul** — tabbed settings page/modal: Overview, Roles, Channels, Invites, Members, Danger Zone
-- [ ] 13.8 **Channel categories** — `channel_categories` table (`id`, `server_id`, `name`, `position`), `category_id` FK on `channels`, collapsible groups in sidebar
-- [ ] 13.9 **Channel reordering** — drag-and-drop to reorder channels within categories, update `position` via server action
+- [x] 13.7 **Server settings overhaul** — tabbed settings page/modal: Overview, Roles, Channels, Invites, Members, Danger Zone
+- [x] 13.8 **Channel categories** — `channel_categories` table (`id`, `server_id`, `name`, `position`), `category_id` FK on `channels`, collapsible groups in sidebar
+- [x] 13.9 **Channel reordering** — drag-and-drop to reorder channels within categories, update `position` via server action
 - [ ] 13.10 **Channel description & topic** — editable topic shown below channel name in header bar, "Edit Channel" modal for name/description/topic
 - [ ] 13.11 **NSFW channel flag** — `nsfw` boolean on `channels`, age-gate modal before entering, NSFW badge in sidebar
 
